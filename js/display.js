@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const timerElement = document.getElementById('timer');
     
     // Set the API URL based on environment
-    const API_URL = 'https://casino-drawing-api.onrender.com'; // REPLACE with your actual Render URL when deployed
+    const API_URL = 'https://your-actual-render-url.onrender.com'; // REPLACE with your actual Render URL when deployed
     
     // Function to display winners
     function displayWinners() {
