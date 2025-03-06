@@ -2,6 +2,8 @@ let winners = [];
 let raffleEntries = [];
 let currentAdditionalWinners = 0;
 let timerInterval;
+let currentSessionId = '';
+let currentPlanName = '';
 
 // Load existing winners if any
 function loadExistingWinners() {
@@ -18,6 +20,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Create the first winner entry
     createWinnerEntry(true);
+    
+    // Load available plans
+    loadSavedPlans();
     
     // Setup event listeners
     document.getElementById('addEntry').addEventListener('click', function() {
@@ -48,52 +53,203 @@ document.addEventListener('DOMContentLoaded', function() {
         startTimer(minutes * 60);
     });
     
-    document.getElementById('pauseTimer').addEventListener('click', pauseTimer);
-    document.getElementById('resetTimer').addEventListener('click', resetTimer);
+    document.getElementById('pauseTimer').addEventListener('click', function() {
+        pauseTimer();
+    });
     
-    // Add navigation buttons at the top of the container
-    const container = document.querySelector('.container');
-    const nav = document.createElement('div');
-    nav.className = 'main-nav';
+    document.getElementById('resetTimer').addEventListener('click', function() {
+        resetTimer();
+    });
     
-    nav.innerHTML = `
-        <a href="index.html" class="nav-button active">Drawing Page</a>
-        <a href="display.html" target="_blank" class="nav-button">Display Page</a>
-        <a href="planning.html" class="nav-button">Planning Page</a>
-    `;
+    // Plan and session selectors
+    document.getElementById('planSelector').addEventListener('change', function() {
+        loadPlanSessions(this.value);
+    });
     
-    container.querySelector('header').appendChild(nav);
+    document.getElementById('sessionSelector').addEventListener('change', function() {
+        currentSessionId = this.value;
+        document.getElementById('endSessionBtn').disabled = !this.value;
+        updateTimerFromSession();
+    });
     
-    // Add winners history table to the page
-    const winnersHistorySection = document.createElement('div');
-    winnersHistorySection.className = 'winners-history';
-    winnersHistorySection.innerHTML = `
-        <h2>Winners History</h2>
-        <table class="winners-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>ID</th>
-                    <th>Drawing Time</th>
-                    <th>Session</th>
-                    <th>Prize</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="winners-history-body">
-            </tbody>
-        </table>
-    `;
+    document.getElementById('endSessionBtn').addEventListener('click', function() {
+        endCurrentSession();
+    });
     
-    document.querySelector('.container').appendChild(winnersHistorySection);
+    // Set up a MutationObserver to watch for new elements in the winners history table
+    const observerOptions = {
+        childList: true,
+        subtree: true
+    };
     
-    // Update any existing winners in the history table
-    updateWinnersHistoryTable();
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && mutation.target.id === 'winners-history-body') {
+                // Add event listeners to new buttons
+                setupWinnerControlButtons();
+            }
+        });
+    });
     
-    // Initial preview update
-    updatePreview();
+    const winnersHistoryBody = document.getElementById('winners-history-body');
+    observer.observe(winnersHistoryBody, observerOptions);
 });
+
+// Load saved plans from localStorage
+function loadSavedPlans() {
+    const planSelector = document.getElementById('planSelector');
+    const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
+    
+    // Clear existing options except the placeholder
+    while (planSelector.options.length > 1) {
+        planSelector.remove(1);
+    }
+    
+    // Add plans to selector
+    savedPlans.forEach(plan => {
+        const option = document.createElement('option');
+        option.value = plan.name;
+        option.textContent = `${plan.name} (${plan.date})`;
+        planSelector.appendChild(option);
+    });
+    
+    // Check if we have an active plan
+    const activePlan = JSON.parse(localStorage.getItem('activePlan') || '{}');
+    if (activePlan.name) {
+        planSelector.value = activePlan.name;
+        loadPlanSessions(activePlan.name);
+    }
+}
+
+// Load sessions for the selected plan
+function loadPlanSessions(planName) {
+    if (!planName) return;
+    
+    currentPlanName = planName;
+    const sessionSelector = document.getElementById('sessionSelector');
+    sessionSelector.disabled = false;
+    
+    // Clear existing sessions
+    while (sessionSelector.options.length > 1) {
+        sessionSelector.remove(1);
+    }
+    
+    // Get the plan
+    const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
+    const selectedPlan = savedPlans.find(plan => plan.name === planName);
+    
+    if (!selectedPlan || !selectedPlan.sessions) {
+        alert('No sessions found for this plan');
+        return;
+    }
+    
+    // Add sessions to selector
+    selectedPlan.sessions.forEach(session => {
+        const option = document.createElement('option');
+        option.value = session.id;
+        option.textContent = `Session ${session.number} (${formatTimeForDisplay(session.startTime)} - ${formatTimeForDisplay(session.endTime)})`;
+        sessionSelector.appendChild(option);
+    });
+    
+    // If there's an active session in this plan, select it
+    if (selectedPlan.activeSession) {
+        sessionSelector.value = selectedPlan.activeSession;
+        currentSessionId = selectedPlan.activeSession;
+        document.getElementById('endSessionBtn').disabled = false;
+        updateTimerFromSession();
+    }
+}
+
+// Format time for display
+function formatTimeForDisplay(timeString) {
+    if (!timeString) return '';
+    
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours);
+    const isPM = hour >= 12;
+    const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    
+    return `${hour12}:${minutes} ${isPM ? 'PM' : 'AM'}`;
+}
+
+// Update timer from session settings
+function updateTimerFromSession() {
+    if (!currentPlanName || !currentSessionId) return;
+    
+    const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
+    const plan = savedPlans.find(p => p.name === currentPlanName);
+    
+    if (plan && plan.masterTimer) {
+        document.getElementById('timerMinutes').value = plan.masterTimer;
+    }
+}
+
+// End current session and save data
+function endCurrentSession() {
+    if (!currentSessionId || !currentPlanName) {
+        alert('No active session selected');
+        return;
+    }
+    
+    // Get current session details
+    const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
+    const plan = savedPlans.find(p => p.name === currentPlanName);
+    const session = plan?.sessions?.find(s => s.id === currentSessionId);
+    
+    if (!session) {
+        alert('Session not found');
+        return;
+    }
+    
+    // Filter winners for this session
+    const sessionWinners = winners.filter(winner => winner.sessionId === currentSessionId);
+    
+    if (sessionWinners.length === 0) {
+        if (!confirm('No winners are recorded for this session. End anyway?')) {
+            return;
+        }
+    }
+    
+    // Save session data to CSV
+    const sessionData = sessionWinners.map(winner => {
+        return {
+            name: winner.name,
+            playerID: winner.playerID,
+            prize: winner.prize,
+            drawingTime: winner.drawingTime,
+            session: `Session ${session.number}`,
+            status: winner.claimed ? 'Claimed' : (winner.disqualified ? 'Disqualified' : 'Active')
+        };
+    });
+    
+    if (sessionData.length > 0) {
+        // Create CSV content
+        const headers = Object.keys(sessionData[0]);
+        const csvContent = [
+            headers.join(','),
+            ...sessionData.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+        ].join('\n');
+        
+        // Save to file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${plan.name}_Session${session.number}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    
+    // Clear session and allow selection of another
+    document.getElementById('sessionSelector').value = '';
+    currentSessionId = '';
+    document.getElementById('endSessionBtn').disabled = true;
+    resetTimer();
+    
+    alert(`Session ${session.number} has been ended and data saved.`);
+}
 
 function createWinnerEntry(isRequired = false) {
     const container = document.getElementById('entries-container');
@@ -313,30 +469,51 @@ function updateWinnersHistoryTable() {
     tableBody.innerHTML = '';
     
     winners.forEach((winner, index) => {
+        // Get session info
+        let sessionText = 'N/A';
+        if (winner.sessionId) {
+            const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
+            for (const plan of savedPlans) {
+                const session = plan.sessions.find(s => s.id === winner.sessionId);
+                if (session) {
+                    sessionText = `${plan.name} - Session ${session.number}`;
+                    break;
+                }
+            }
+        }
+        
         const row = document.createElement('tr');
-        
-        const status = winner.claimed ? 'claimed' : (winner.disqualified ? 'disqualified' : 'active');
-        const statusText = status.charAt(0).toUpperCase() + status.slice(1);
-        
         row.innerHTML = `
-            <td>${winner.name || 'Anonymous'}</td>
-            <td>${winner.uniqueId || 'N/A'}</td>
-            <td>${winner.timestamp || new Date().toLocaleString()}</td>
-            <td>${winner.session || 'Default'}</td>
-            <td>${winner.prize || 'Prize'}</td>
-            <td><span class="status-badge status-${status}">${statusText}</span></td>
+            <td>${winner.playerID || 'N/A'}</td>
+            <td>${winner.name}</td>
+            <td>${winner.prize || 'N/A'}</td>
+            <td>${sessionText}</td>
+            <td>
+                <span class="status-badge ${winner.claimed ? 'status-claimed' : (winner.disqualified ? 'status-disqualified' : 'status-active')}">
+                    ${winner.claimed ? 'Claimed' : (winner.disqualified ? 'Disqualified' : 'Active')}
+                </span>
+            </td>
             <td class="winner-actions">
                 ${!winner.claimed && !winner.disqualified ? 
-                  `<button class="claim-button" data-index="${index}">Claim</button>
-                   <button class="disqualify-button" data-index="${index}">Disqualify</button>` : 
-                  `<button class="unclaim-button" data-index="${index}">Unclaim</button>`}
+                    `<button class="claim-button" data-index="${index}">Claim</button>` : ''}
+                ${!winner.claimed && !winner.disqualified ? 
+                    `<button class="disqualify-button" data-index="${index}">Disqualify</button>` : ''}
+                ${winner.claimed || winner.disqualified ? 
+                    `<button class="unclaim-button" data-index="${index}">Reset Status</button>` : ''}
+                <button class="remove-winner-button" data-index="${index}">Remove</button>
             </td>
         `;
         
         tableBody.appendChild(row);
     });
     
-    // Add event listeners to the new buttons
+    // Setup control buttons
+    setupWinnerControlButtons();
+}
+
+// Setup event listeners for winner control buttons
+function setupWinnerControlButtons() {
+    // Claim buttons
     document.querySelectorAll('.claim-button').forEach(button => {
         button.addEventListener('click', function() {
             const index = parseInt(this.getAttribute('data-index'));
@@ -344,6 +521,7 @@ function updateWinnersHistoryTable() {
         });
     });
     
+    // Disqualify buttons
     document.querySelectorAll('.disqualify-button').forEach(button => {
         button.addEventListener('click', function() {
             const index = parseInt(this.getAttribute('data-index'));
@@ -351,6 +529,7 @@ function updateWinnersHistoryTable() {
         });
     });
     
+    // Unclaim buttons
     document.querySelectorAll('.unclaim-button').forEach(button => {
         button.addEventListener('click', function() {
             const index = parseInt(this.getAttribute('data-index'));
@@ -358,9 +537,13 @@ function updateWinnersHistoryTable() {
         });
     });
     
-    // Also update the display
-    updateWinnerDisplay();
-    updatePreview();
+    // Remove winner buttons
+    document.querySelectorAll('.remove-winner-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            removeWinner(index);
+        });
+    });
 }
 
 function claimWinner(index) {
@@ -402,6 +585,16 @@ function unclaimWinner(index) {
     updateWinnersHistoryTable();
 }
 
+function removeWinner(index) {
+    if (confirm('Are you sure you want to remove this winner? This action cannot be undone.')) {
+        winners.splice(index, 1);
+        localStorage.setItem('winners', JSON.stringify(winners));
+        updateWinnersHistoryTable();
+        updateWinnerDisplay();
+        updatePreview();
+    }
+}
+
 function exportWinnersToCSV() {
     // Include all winners regardless of claimed or disqualified status
     let csvContent = "data:text/csv;charset=utf-8,";
@@ -431,77 +624,54 @@ function exportWinnersToCSV() {
 }
 
 function selectWinner() {
-    // Gather information from form
-    const entries = document.querySelectorAll('.winner-entry');
+    const entriesContainer = document.getElementById('entries-container');
+    const entries = entriesContainer.querySelectorAll('.winner-entry');
+    
+    // Check if we have a session selected
+    if (!currentSessionId) {
+        alert('Please select a session before submitting winners');
+        return;
+    }
+    
+    // Process each entry
     entries.forEach(entry => {
         const nameInput = entry.querySelector('.winner-name');
-        const idInput = entry.querySelector('.winner-id');
+        const prizeDrop = entry.querySelector('.winner-prize');
+        const playerIdInput = entry.querySelector('.player-id');
         
-        if (idInput && idInput.value) {
-            const displayName = nameInput ? nameInput.value : 'Anonymous';
-            const uniqueId = idInput.value;
-            
-            // Get the active session and prize from planning data if available
-            const activePlan = JSON.parse(localStorage.getItem('activePlan')) || {};
-            const activeSession = activePlan.activeSession || 'Default';
-            const prizes = activePlan.prizes || [];
-            
-            // Find an available prize for this session
-            let prize = "Prize";
-            if (prizes.length > 0) {
-                const availablePrizes = prizes.filter(p => !p.assigned);
-                if (availablePrizes.length > 0) {
-                    prize = availablePrizes[0].name;
-                    // Mark this prize as assigned
-                    const prizeIndex = prizes.findIndex(p => p.name === prize && !p.assigned);
-                    if (prizeIndex !== -1) {
-                        prizes[prizeIndex].assigned = true;
-                    }
-                }
-            }
-            
-            // Add more info to the winner object
-            const winner = {
-                name: displayName,
-                uniqueId: uniqueId,
-                timestamp: new Date().toLocaleString(),
-                session: activeSession,
-                prize: prize,
-                claimed: false,
-                disqualified: false
-            };
-            
-            winners.push(winner);
-            
-            // Update the planning data if we assigned a prize
-            if (activePlan && prizes.length > 0) {
-                activePlan.prizes = prizes;
-                localStorage.setItem('activePlan', JSON.stringify(activePlan));
-            }
-        }
-    });
-    
-    // Clear inputs after submission (except the first required one)
-    entries.forEach((entry, index) => {
-        if (index > 0) {
-            entry.remove();
-        } else {
-            entry.querySelector('.winner-name').value = '';
-            entry.querySelector('.winner-id').value = '';
-        }
+        const name = nameInput.value.trim();
+        const prize = prizeDrop ? prizeDrop.value : '';
+        const playerID = playerIdInput ? playerIdInput.value.trim() : '';
+        
+        // Skip empty entries
+        if (!name) return;
+        
+        // Create winner object
+        const winner = {
+            name: name,
+            prize: prize,
+            playerID: playerID,
+            drawingTime: new Date().toISOString(),
+            sessionId: currentSessionId,
+            claimed: false,
+            disqualified: false
+        };
+        
+        // Add to winners array
+        winners.push(winner);
     });
     
     // Save winners to localStorage
     localStorage.setItem('winners', JSON.stringify(winners));
     
-    // Update the history table
+    // Update display
     updateWinnersHistoryTable();
-    
-    // Create a new empty winner entry
-    createWinnerEntry(true);
-    
-    // Update the preview
+    updateWinnerDisplay();
     updatePreview();
+    
+    // Clear entries
+    entriesContainer.innerHTML = '';
+    createWinnerEntry(true);
 }
 
 function updateWinnerDisplay() {

@@ -19,92 +19,108 @@
         
         <main>
             <div class="planning-container">
-                <div class="promotion-info">
-                    <h2>Promotion Details</h2>
-                    <div class="form-group">
-                        <label for="promotionName">Promotion Name</label>
-                        <input type="text" id="promotionName" placeholder="Enter promotion name">
-                    </div>
-                    <div class="form-group">
-                        <label for="promotionDate">Date</label>
-                        <input type="date" id="promotionDate">
-                    </div>
-                    <div class="form-group">
-                        <label for="masterTimer">Master Timer (minutes)</label>
-                        <input type="number" id="masterTimer" min="1" max="120" value="5">
-                    </div>
-                    
-                    <div class="prize-management">
-                        <h3>Prize Management</h3>
-                        <div id="prize-list">
-                            <div class="prize-item">
-                                <input type="text" placeholder="Prize name" class="prize-name">
-                                <input type="text" placeholder="Value" class="prize-value">
-                                <button type="button" class="remove-prize">×</button>
-                                <button type="button" class="repeat-prize-button">Apply to all sessions</button>
-                            </div>
-                        </div>
-                        <button type="button" id="add-prize" class="secondary-btn">+ Add Prize</button>
-                    </div>
-                </div>
-                
-                <div class="bulk-session-creator">
-                    <h3>Bulk Session Creation</h3>
-                    <div class="bulk-options">
+                <!-- Top row: Promotion details and bulk session creation -->
+                <div class="planning-grid">
+                    <!-- Left column: Promotion info and prizes -->
+                    <div class="grid-item promotion-details">
+                        <h2>1. Promotion Details</h2>
                         <div class="form-group">
-                            <label>Time Range</label>
-                            <div class="time-range">
-                                <input type="time" id="bulk-start-time">
-                                <span>to</span>
-                                <input type="time" id="bulk-end-time">
-                            </div>
+                            <label for="promotionName">Promotion Name</label>
+                            <input type="text" id="promotionName" placeholder="Enter promotion name">
                         </div>
                         <div class="form-group">
-                            <label>Interval</label>
-                            <div class="interval-selector">
-                                <input type="number" id="interval-value" min="1" value="60">
-                                <select id="interval-unit">
-                                    <option value="minutes">Minutes</option>
-                                    <option value="hours">Hours</option>
-                                </select>
-                            </div>
+                            <label for="promotionDate">Date</label>
+                            <input type="date" id="promotionDate">
                         </div>
                         <div class="form-group">
-                            <label for="winners-per-session">Winners per Session</label>
-                            <input type="number" id="winners-per-session" min="1" value="1">
+                            <label for="masterTimer">Master Timer (minutes)</label>
+                            <input type="number" id="masterTimer" min="1" max="120" value="5">
                         </div>
                     </div>
-                    <button type="button" id="create-sessions" class="primary-btn">Create Sessions</button>
-                </div>
-                
-                <div class="sessions-container">
-                    <h2>Drawing Sessions</h2>
-                    <div id="sessions-list">
-                        <!-- Sessions will be added here -->
+
+                    <!-- Right column: Prize management -->
+                    <div class="grid-item prize-management-container">
+                        <h2>2. Prize Management</h2>
+                        <div class="prize-management">
+                            <div id="prize-list">
+                                <div class="prize-item">
+                                    <input type="text" placeholder="Prize name" class="prize-name">
+                                    <input type="text" placeholder="Value" class="prize-value">
+                                    <button type="button" class="remove-prize">×</button>
+                                    <button type="button" class="repeat-prize-button">Apply to all sessions</button>
+                                </div>
+                            </div>
+                            <button type="button" id="add-prize" class="secondary-btn">+ Add Prize</button>
+                        </div>
                     </div>
-                    <button type="button" id="add-session" class="primary-btn">+ Add Drawing Session</button>
-                </div>
-                
-                <div class="timeline-container">
-                    <h2>Timeline</h2>
-                    <div id="timeline-view" class="timeline">
-                        <!-- Timeline will be generated here -->
-                        <div class="timeline-placeholder">Sessions will be visualized here</div>
+
+                    <!-- Bottom left: Bulk session creator -->
+                    <div class="grid-item bulk-session-container">
+                        <h2>3. Bulk Session Creation</h2>
+                        <div class="bulk-session-creator">
+                            <div class="bulk-options">
+                                <div class="form-group">
+                                    <label>Time Range</label>
+                                    <div class="time-range">
+                                        <input type="time" id="bulk-start-time">
+                                        <span>to</span>
+                                        <input type="time" id="bulk-end-time">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Interval</label>
+                                    <div class="interval-selector">
+                                        <input type="number" id="interval-value" min="1" value="60">
+                                        <select id="interval-unit">
+                                            <option value="minutes">Minutes</option>
+                                            <option value="hours">Hours</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="winners-per-session">Winners per Session</label>
+                                    <input type="number" id="winners-per-session" min="1" value="1">
+                                </div>
+                            </div>
+                            <button type="button" id="create-sessions" class="primary-btn">Create Sessions</button>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="action-buttons">
-                    <button type="button" id="save-plan" class="primary-btn">Save Plan</button>
-                    <button type="button" id="load-plan" class="secondary-btn">Load Plan</button>
-                    <button type="button" id="clear-plan" class="danger-btn">Clear Plan</button>
-                </div>
-                
-                <div class="saved-plans-list">
-                    <h3>Saved Plans</h3>
-                    <select id="saved-plans-select">
-                        <option value="">Select a saved plan</option>
-                    </select>
-                    <button type="button" id="delete-plan" class="danger-btn">Delete Selected Plan</button>
+
+                    <!-- Bottom right: Sessions -->
+                    <div class="grid-item sessions-container">
+                        <h2>4. Drawing Sessions</h2>
+                        <div id="sessions-grid">
+                            <!-- Sessions will be added here in a grid -->
+                        </div>
+                        <button type="button" id="add-session" class="primary-btn">+ Add Drawing Session</button>
+                    </div>
+
+                    <!-- Full width: Timeline -->
+                    <div class="grid-item timeline-container">
+                        <h2>5. Timeline</h2>
+                        <div id="timeline-view" class="timeline">
+                            <!-- Timeline will be generated here -->
+                            <div class="timeline-placeholder">Sessions will be visualized here</div>
+                        </div>
+                    </div>
+
+                    <!-- Full width: Actions -->
+                    <div class="grid-item action-buttons-container">
+                        <h2>6. Plan Management</h2>
+                        <div class="action-buttons">
+                            <button type="button" id="save-plan" class="primary-btn">Save Plan</button>
+                            <button type="button" id="load-plan" class="secondary-btn">Load Plan</button>
+                            <button type="button" id="clear-plan" class="danger-btn">Clear Plan</button>
+                        </div>
+                        
+                        <div class="saved-plans-list">
+                            <h3>Saved Plans</h3>
+                            <select id="saved-plans-select">
+                                <option value="">Select a saved plan</option>
+                            </select>
+                            <button type="button" id="delete-plan" class="danger-btn">Delete Selected Plan</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>

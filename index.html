@@ -18,6 +18,23 @@
         </header>
         
         <main>
+            <!-- Plan and Session Selection -->
+            <div class="plan-session-selector">
+                <div class="form-group">
+                    <label for="planSelector">Select Promotion Plan</label>
+                    <select id="planSelector">
+                        <option value="">Select a plan</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sessionSelector">Current Session</label>
+                    <select id="sessionSelector" disabled>
+                        <option value="">Select a session</option>
+                    </select>
+                </div>
+                <button type="button" id="endSessionBtn" class="primary-btn" disabled>End Session</button>
+            </div>
+            
             <!-- Display Preview moved to top -->
             <div class="preview-container">
                 <h2>Display Preview</h2>
@@ -64,7 +81,25 @@
                 </div>
             </div>
             
-            <!-- Winners history section will be added dynamically via JavaScript -->
+            <!-- Winners History Table -->
+            <div class="winners-history">
+                <h2>Winners History</h2>
+                <table class="winners-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Prize</th>
+                            <th>Drawing Session</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="winners-history-body">
+                        <!-- Winner history rows will be added here -->
+                    </tbody>
+                </table>
+            </div>
         </main>
         
         <footer>

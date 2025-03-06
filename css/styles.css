@@ -856,4 +856,141 @@ footer {
     padding: 4px 8px;
     font-size: 0.8rem;
     border-radius: 3px;
+}
+
+/* Planning Page Grid Layout */
+.planning-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    width: 100%;
+    margin-bottom: 30px;
+}
+
+.grid-item {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.grid-item h2 {
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 10px;
+    font-size: 1.4rem;
+}
+
+.timeline-container, .action-buttons-container {
+    grid-column: span 2;
+}
+
+/* Sessions grid layout */
+#sessions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.session-grid-item {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.session-grid-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Make the timeline hours display properly */
+.timeline-hour {
+    position: absolute;
+    top: -25px;
+    transform: translateX(-50%);
+    font-size: 0.85rem;
+    color: var(--secondary-text);
+}
+
+/* Mobile responsiveness for planning grid */
+@media (max-width: 768px) {
+    .planning-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .timeline-container, .action-buttons-container {
+        grid-column: 1;
+    }
+    
+    #sessions-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Plan Session Selector */
+.plan-session-selector {
+    background-color: var(--card-bg);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 15px;
+    align-items: end;
+}
+
+.plan-session-selector .form-group {
+    margin-bottom: 0;
+}
+
+.plan-session-selector select {
+    width: 100%;
+    padding: 10px;
+    background-color: #333;
+    color: var(--text-color);
+    border: 1px solid #444;
+    border-radius: 4px;
+}
+
+.plan-session-selector select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#endSessionBtn {
+    padding: 10px 15px;
+    height: 42px;
+}
+
+#endSessionBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #555;
+}
+
+/* Winner control buttons */
+.remove-winner-button {
+    background-color: var(--danger-color);
+    color: white;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 5px;
+    font-size: 0.8rem;
+}
+
+.remove-winner-button:hover {
+    background-color: #ff6666;
+}
+
+/* Mobile responsiveness for plan selector */
+@media (max-width: 768px) {
+    .plan-session-selector {
+        grid-template-columns: 1fr;
+    }
 } 
