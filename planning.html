@@ -13,6 +13,7 @@
             <nav class="main-nav">
                 <a href="index.html" class="nav-button">Winner Input Page</a>
                 <a href="display.html" target="_blank" class="nav-button">Display Page</a>
+                <a href="planning.html" class="nav-button active">Planning Page</a>
             </nav>
         </header>
         
@@ -40,10 +41,40 @@
                                 <input type="text" placeholder="Prize name" class="prize-name">
                                 <input type="text" placeholder="Value" class="prize-value">
                                 <button type="button" class="remove-prize">×</button>
+                                <button type="button" class="repeat-prize-button">Apply to all sessions</button>
                             </div>
                         </div>
                         <button type="button" id="add-prize" class="secondary-btn">+ Add Prize</button>
                     </div>
+                </div>
+                
+                <div class="bulk-session-creator">
+                    <h3>Bulk Session Creation</h3>
+                    <div class="bulk-options">
+                        <div class="form-group">
+                            <label>Time Range</label>
+                            <div class="time-range">
+                                <input type="time" id="bulk-start-time">
+                                <span>to</span>
+                                <input type="time" id="bulk-end-time">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Interval</label>
+                            <div class="interval-selector">
+                                <input type="number" id="interval-value" min="1" value="60">
+                                <select id="interval-unit">
+                                    <option value="minutes">Minutes</option>
+                                    <option value="hours">Hours</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="winners-per-session">Winners per Session</label>
+                            <input type="number" id="winners-per-session" min="1" value="1">
+                        </div>
+                    </div>
+                    <button type="button" id="create-sessions" class="primary-btn">Create Sessions</button>
                 </div>
                 
                 <div class="sessions-container">
