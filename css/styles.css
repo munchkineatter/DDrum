@@ -27,37 +27,45 @@ body {
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 15px;
 }
 
 header {
     text-align: center;
-    margin-bottom: 30px;
-    padding-bottom: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
     border-bottom: 2px solid #333;
 }
 
 header h1 {
     color: var(--primary-color);
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     text-shadow: 0 0 10px rgba(0, 200, 255, 0.3);
+}
+
+/* Layout for content wrapper */
+.content-wrapper {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
 }
 
 /* Form styles */
 #winnerForm {
     background: var(--card-bg);
-    padding: 20px;
+    padding: 15px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 200, 255, 0.2);
-    margin-bottom: 30px;
+    margin-bottom: 20px;
+    flex: 1;
 }
 
 .winner-entry {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 15px;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
     border-bottom: 1px dashed #333;
 }
 
@@ -68,22 +76,23 @@ header h1 {
 }
 
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
 label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
     font-weight: bold;
     color: var(--primary-color);
+    font-size: 0.9rem;
 }
 
 input, select {
     width: 100%;
-    padding: 10px;
+    padding: 8px;
     border: 1px solid #333;
     border-radius: 4px;
-    font-size: 16px;
+    font-size: 0.95rem;
     background: rgba(0, 0, 0, 0.2);
     color: var(--text-color);
 }
@@ -98,18 +107,18 @@ input:focus, select:focus {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    margin-top: 20px;
-    gap: 10px;
+    margin-top: 15px;
+    gap: 8px;
 }
 
 button {
     background: var(--primary-color);
     color: var(--dark-bg);
     border: none;
-    padding: 10px 20px;
+    padding: 8px 16px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 0.9rem;
     font-weight: bold;
     transition: all 0.3s;
 }
@@ -122,6 +131,8 @@ button:hover {
 
 .remove-entry {
     background: var(--danger-color);
+    font-size: 0.8rem;
+    padding: 4px 8px;
 }
 
 .remove-entry:hover {
@@ -136,6 +147,25 @@ button:hover {
     background: #cc0000;
 }
 
+/* Timer control box - floating */
+.timer-control-box {
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 200, 255, 0.2);
+    width: 280px;
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+}
+
+.timer-control-box h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 1.2rem;
+}
+
 /* Display page styles */
 .display-page {
     background: var(--dark-bg);
@@ -147,17 +177,17 @@ button:hover {
 
 #winners-display {
     background: var(--card-bg);
-    padding: 30px;
+    padding: 20px;
     border-radius: 8px;
     box-shadow: 0 0 20px rgba(0, 200, 255, 0.2);
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
 
 .winner-card {
     background: rgba(30, 30, 30, 0.8);
     border-left: 4px solid var(--primary-color);
-    margin-bottom: 20px;
-    padding: 20px;
+    margin-bottom: 15px;
+    padding: 15px;
     border-radius: 4px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     transition: transform 0.3s, opacity 0.3s;
@@ -167,34 +197,35 @@ button:hover {
 
 .winner-card h2 {
     color: var(--primary-color);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    font-size: 1.3rem;
 }
 
 .winner-card p {
-    font-size: 1.2rem;
-    margin-bottom: 8px;
+    font-size: 1.1rem;
+    margin-bottom: 6px;
 }
 
 .drawing-time {
     color: var(--secondary-text);
-    font-size: 0.9rem !important;
+    font-size: 0.8rem !important;
     text-align: right;
 }
 
 .placeholder {
     text-align: center;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     color: var(--secondary-text);
-    padding: 50px 0;
+    padding: 30px 0;
 }
 
 /* Timer styles */
 .timer {
-    font-size: 3rem;
+    font-size: 2.5rem;
     text-align: center;
     color: var(--primary-color);
     font-weight: bold;
-    margin: 20px 0;
+    margin: 15px 0;
     text-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
 }
 
@@ -205,37 +236,41 @@ button:hover {
 
 .timer-controls {
     display: flex;
-    align-items: center;
-    gap: 15px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .timer-controls input {
-    max-width: 100px;
+    max-width: 100%;
 }
 
 .timer-buttons {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    justify-content: center;
+}
+
+.timer-buttons button {
+    flex: 1;
 }
 
 /* Header image styles */
 .header-image-container, .header-image {
     max-width: 100%;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     text-align: center;
 }
 
 .header-image img, .header-image-container img {
     max-width: 100%;
-    max-height: 200px;
+    max-height: 180px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .image-preview {
-    margin-top: 10px;
-    max-width: 200px;
+    margin-top: 8px;
+    max-width: 150px;
 }
 
 .image-preview img {
@@ -245,8 +280,8 @@ button:hover {
 
 /* Preview container styles */
 .preview-container {
-    margin-top: 40px;
-    padding: 20px;
+    margin-bottom: 20px;
+    padding: 15px;
     background: var(--card-bg);
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 200, 255, 0.2);
@@ -254,20 +289,21 @@ button:hover {
 
 .preview-container h2 {
     color: var(--primary-color);
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     text-align: center;
+    font-size: 1.5rem;
 }
 
 .display-preview {
     background: rgba(0, 0, 0, 0.3);
-    padding: 20px;
+    padding: 15px;
     border-radius: 8px;
-    min-height: 200px;
+    min-height: 150px;
 }
 
 .export-controls {
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
 @keyframes fadeIn {
@@ -282,14 +318,25 @@ button:hover {
 }
 
 footer {
-    margin-top: 30px;
+    margin-top: 20px;
     text-align: center;
     color: var(--secondary-text);
+    font-size: 0.9rem;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .controls, .export-controls, .timer-controls {
+    .content-wrapper {
+        flex-direction: column;
+    }
+    
+    .timer-control-box {
+        width: 100%;
+        position: static;
+        margin-bottom: 20px;
+    }
+    
+    .controls, .export-controls {
         flex-direction: column;
     }
     
@@ -299,5 +346,434 @@ footer {
     
     .timer {
         font-size: 2rem;
+    }
+}
+
+/* Navigation styles */
+.main-nav {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.nav-button {
+    background: var(--card-bg);
+    color: var(--primary-color);
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.nav-button:hover {
+    background: var(--primary-color);
+    color: var(--dark-bg);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Planning page styles */
+.planning-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.promotion-info, .sessions-container, .timeline-container {
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 200, 255, 0.2);
+}
+
+.promotion-info h2, .sessions-container h2, .timeline-container h2 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    font-size: 1.4rem;
+}
+
+.prize-management {
+    margin-top: 20px;
+    border-top: 1px dashed #333;
+    padding-top: 15px;
+}
+
+.prize-management h3 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+}
+
+#prize-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.prize-item {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.remove-prize {
+    background: var(--danger-color);
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    padding: 0;
+}
+
+.session-item {
+    background: rgba(30, 30, 30, 0.5);
+    border-left: 4px solid var(--primary-color);
+    margin-bottom: 15px;
+    border-radius: 4px;
+    overflow: hidden;
+    transition: all 0.3s;
+}
+
+.session-item.active {
+    border-color: var(--primary-hover);
+    background: rgba(0, 200, 255, 0.1);
+}
+
+.session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.session-header h3 {
+    color: var(--primary-color);
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.remove-session {
+    background: var(--danger-color);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    padding: 0;
+}
+
+.session-content {
+    padding: 15px;
+}
+
+.time-range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.time-range span {
+    color: var(--secondary-text);
+}
+
+.session-prizes {
+    margin-top: 15px;
+}
+
+.session-prizes-list {
+    margin: 10px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.prize-selection {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Timeline styles */
+.timeline {
+    position: relative;
+    height: 120px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    margin-top: 15px;
+    overflow: hidden;
+}
+
+.timeline-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--secondary-text);
+}
+
+.timeline-period {
+    position: relative;
+    height: 100%;
+    padding: 25px 10px 10px;
+}
+
+.timeline-scale {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+    color: var(--secondary-text);
+    font-size: 0.9rem;
+}
+
+.timeline-slots {
+    position: relative;
+    height: 100%;
+    background: linear-gradient(0deg, rgba(0,200,255,0.1) 0%, rgba(0,0,0,0) 100%);
+    border-radius: 4px;
+}
+
+.timeline-session {
+    position: absolute;
+    height: 70px;
+    top: 10px;
+    background: rgba(0, 200, 255, 0.2);
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
+    padding: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.timeline-session:hover {
+    background: rgba(0, 200, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.timeline-session-label {
+    font-weight: bold;
+    color: var(--primary-color);
+    font-size: 0.9rem;
+}
+
+.timeline-session-time {
+    font-size: 0.8rem;
+    color: var(--text-color);
+}
+
+.timeline-session-winners {
+    font-size: 0.8rem;
+    color: var(--secondary-text);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.primary-btn {
+    background: var(--primary-color);
+    color: var(--dark-bg);
+}
+
+.secondary-btn {
+    background: var(--card-bg);
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+}
+
+.saved-plans-list {
+    margin-top: 20px;
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 200, 255, 0.2);
+}
+
+.saved-plans-list h3 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+}
+
+#saved-plans-select {
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+/* Winner status management */
+.winner-status-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.claim-button {
+    background: #28a745;
+    color: white;
+    font-size: 0.8rem;
+    padding: 3px 8px;
+}
+
+.disqualify-button {
+    background: var(--danger-color);
+    color: white;
+    font-size: 0.8rem;
+    padding: 3px 8px;
+}
+
+.unclaim-button {
+    background: #ffc107;
+    color: #212529;
+    font-size: 0.8rem;
+    padding: 3px 8px;
+}
+
+.winner-card.claimed {
+    border-left-color: #28a745;
+    opacity: 0.7;
+}
+
+.winner-card.claimed::after {
+    content: 'CLAIMED';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #28a745;
+    color: white;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border-radius: 3px;
+}
+
+.winner-card.disqualified {
+    border-left-color: var(--danger-color);
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.winner-card.disqualified::after {
+    content: 'DISQUALIFIED';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--danger-color);
+    color: white;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border-radius: 3px;
+}
+
+/* Winners history table */
+.winners-history {
+    margin-top: 20px;
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 200, 255, 0.2);
+}
+
+.winners-history h2 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 1.5rem;
+}
+
+.winners-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.winners-table th, .winners-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #333;
+}
+
+.winners-table th {
+    color: var(--primary-color);
+    font-size: 0.9rem;
+}
+
+.winners-table tr:hover {
+    background: rgba(0, 200, 255, 0.1);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.status-active {
+    background: var(--primary-color);
+    color: var(--dark-bg);
+}
+
+.status-claimed {
+    background: #28a745;
+    color: white;
+}
+
+.status-disqualified {
+    background: var(--danger-color);
+    color: white;
+}
+
+.winner-actions {
+    display: flex;
+    gap: 5px;
+}
+
+/* Responsive adjustments for planning page */
+@media (max-width: 768px) {
+    .prize-item {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .remove-prize {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+    }
+    
+    .prize-selection {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .timeline {
+        height: 150px;
     }
 } 

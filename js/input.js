@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const API_URL = 'https://casino-drawing-system.onrender.com'; // Actual Render service URL
 
     // Function to create a new winner entry
-    function createWinnerEntry() {
+    function createWinnerEntry(isRequired = false) {
         const entryId = entryCount++;
         const entryDiv = document.createElement('div');
         entryDiv.className = 'winner-entry';
@@ -16,11 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         entryDiv.innerHTML = `
             <div class="form-group">
-                <label for="winner-${entryId}">Winner #${entryId + 1}</label>
+                <label for="winner-${entryId}">Winner #${entryId + 1} ${isRequired ? '*' : '(optional)'}</label>
                 <input type="text" id="winner-${entryId}" name="winner-${entryId}" 
-                    placeholder="Enter winner name and ID" required>
+                    placeholder="Enter winner name and ID" ${isRequired ? 'required' : ''}>
             </div>
-            ${entryCount > 5 ? `<button type="button" class="remove-entry" data-id="${entryId}">Remove</button>` : ''}
+            ${entryId > 0 ? `<button type="button" class="remove-entry" data-id="${entryId}">Remove</button>` : ''}
         `;
 
         entriesContainer.appendChild(entryDiv);
@@ -34,10 +34,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Add initial 5 entries
-    for (let i = 0; i < 5; i++) {
-        createWinnerEntry();
-    }
+    // Add only one required entry initially
+    createWinnerEntry(true); // First entry is required
 
     // Add event listener for the Add Winner button
     addEntryButton.addEventListener('click', createWinnerEntry);
@@ -275,4 +273,238 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial preview update
     updatePreview();
-}); 
+
+    // Add navigation buttons at the top of the container
+    const container = document.querySelector('.container');
+    const nav = document.createElement('div');
+    nav.className = 'main-nav';
+    
+    nav.innerHTML = `
+        <a href="index.html" class="nav-button">Drawing Page</a>
+        <a href="planning.html" class="nav-button">Planning Page</a>
+    `;
+    
+    container.prepend(nav);
+    
+    // Add winners history table to the page
+    const winnersHistorySection = document.createElement('div');
+    winnersHistorySection.className = 'winners-history';
+    winnersHistorySection.innerHTML = `
+        <h2>Winners History</h2>
+        <table class="winners-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>ID</th>
+                    <th>Drawing Time</th>
+                    <th>Session</th>
+                    <th>Prize</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="winners-history-body">
+            </tbody>
+        </table>
+    `;
+    
+    document.querySelector('.container').appendChild(winnersHistorySection);
+    
+    // Update any existing winners in the history table
+    updateWinnersHistoryTable();
+});
+
+// Add these new functions for winner status management
+
+function updateWinnersHistoryTable() {
+    const tableBody = document.getElementById('winners-history-body');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '';
+    
+    winners.forEach((winner, index) => {
+        const row = document.createElement('tr');
+        
+        const status = winner.claimed ? 'claimed' : (winner.disqualified ? 'disqualified' : 'active');
+        const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+        
+        row.innerHTML = `
+            <td>${winner.name || 'Anonymous'}</td>
+            <td>${winner.uniqueId || 'N/A'}</td>
+            <td>${winner.timestamp || new Date().toLocaleString()}</td>
+            <td>${winner.session || 'Default'}</td>
+            <td>${winner.prize || 'Prize'}</td>
+            <td><span class="status-badge status-${status}">${statusText}</span></td>
+            <td class="winner-actions">
+                ${!winner.claimed && !winner.disqualified ? 
+                  `<button class="claim-button" data-index="${index}">Claim</button>
+                   <button class="disqualify-button" data-index="${index}">Disqualify</button>` : 
+                  `<button class="unclaim-button" data-index="${index}">Unclaim</button>`}
+            </td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+    
+    // Add event listeners to the new buttons
+    document.querySelectorAll('.claim-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            claimWinner(index);
+        });
+    });
+    
+    document.querySelectorAll('.disqualify-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            disqualifyWinner(index);
+        });
+    });
+    
+    document.querySelectorAll('.unclaim-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            unclaimWinner(index);
+        });
+    });
+    
+    // Also update the display
+    updateWinnerDisplay();
+}
+
+function claimWinner(index) {
+    if (index < 0 || index >= winners.length) return;
+    
+    winners[index].claimed = true;
+    winners[index].disqualified = false;
+    
+    // Save to localStorage
+    localStorage.setItem('winners', JSON.stringify(winners));
+    
+    // Update the history table and display
+    updateWinnersHistoryTable();
+}
+
+function disqualifyWinner(index) {
+    if (index < 0 || index >= winners.length) return;
+    
+    winners[index].disqualified = true;
+    winners[index].claimed = false;
+    
+    // Save to localStorage
+    localStorage.setItem('winners', JSON.stringify(winners));
+    
+    // Update the history table and display
+    updateWinnersHistoryTable();
+}
+
+function unclaimWinner(index) {
+    if (index < 0 || index >= winners.length) return;
+    
+    winners[index].claimed = false;
+    winners[index].disqualified = false;
+    
+    // Save to localStorage
+    localStorage.setItem('winners', JSON.stringify(winners));
+    
+    // Update the history table and display
+    updateWinnersHistoryTable();
+}
+
+function exportWinnersToCSV() {
+    // ... existing code ...
+    
+    // Include all winners regardless of claimed or disqualified status
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Name,ID,Time,Session,Prize,Status\n";
+    
+    winners.forEach(winner => {
+        const status = winner.claimed ? 'Claimed' : (winner.disqualified ? 'Disqualified' : 'Active');
+        const row = [
+            winner.name || 'Anonymous',
+            winner.uniqueId || 'N/A',
+            winner.timestamp || new Date().toLocaleString(),
+            winner.session || 'Default',
+            winner.prize || 'Prize',
+            status
+        ].map(value => `"${value}"`).join(',');
+        
+        csvContent += row + "\n";
+    });
+    
+    // ... existing code (for download) ...
+}
+
+// Modify the selectWinner function to add session and prize info
+function selectWinner() {
+    // ... existing code ...
+    
+    // Get the active session and prize from planning data if available
+    const activePlan = JSON.parse(localStorage.getItem('activePlan')) || {};
+    const activeSession = activePlan.activeSession || 'Default';
+    const prizes = activePlan.prizes || [];
+    
+    // Find an available prize for this session
+    let prize = "Prize";
+    if (prizes.length > 0) {
+        const availablePrizes = prizes.filter(p => !p.assigned);
+        if (availablePrizes.length > 0) {
+            prize = availablePrizes[0].name;
+            // Mark this prize as assigned
+            const prizeIndex = prizes.findIndex(p => p.name === prize && !p.assigned);
+            if (prizeIndex !== -1) {
+                prizes[prizeIndex].assigned = true;
+            }
+        }
+    }
+    
+    // ... existing code ...
+    
+    // Add more info to the winner object
+    const winner = {
+        name: displayName,
+        uniqueId: uniqueId,
+        timestamp: new Date().toLocaleString(),
+        session: activeSession,
+        prize: prize,
+        claimed: false,
+        disqualified: false
+    };
+    
+    winners.push(winner);
+    
+    // Update the planning data if we assigned a prize
+    if (activePlan && prizes.length > 0) {
+        activePlan.prizes = prizes;
+        localStorage.setItem('activePlan', JSON.stringify(activePlan));
+    }
+    
+    // ... existing code ...
+    
+    // Update the history table
+    updateWinnersHistoryTable();
+    
+    // ... existing code ...
+}
+
+// Update the updateWinnerDisplay function to handle claimed and disqualified winners
+function updateWinnerDisplay() {
+    const displayContainer = document.getElementById('displayWinners');
+    if (!displayContainer) return;
+    
+    displayContainer.innerHTML = '';
+    
+    // Get active winners (not claimed or disqualified)
+    const activeWinners = winners.filter(w => !w.claimed && !w.disqualified);
+    
+    activeWinners.forEach(winner => {
+        const winnerCard = document.createElement('div');
+        winnerCard.className = 'winner-card';
+        winnerCard.innerHTML = `
+            <div class="winner-name">${winner.name || 'Anonymous'}</div>
+            <div class="winner-id">${winner.uniqueId || 'N/A'}</div>
+            <div class="winner-prize">${winner.prize || 'Prize'}</div>
+        `;
+        displayContainer.appendChild(winnerCard);
+    });
+} 

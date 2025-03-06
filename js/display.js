@@ -6,6 +6,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set the API URL based on environment
     const API_URL = 'https://casino-drawing-system.onrender.com'; // Actual Render service URL
     
+    // Add navigation at the top
+    const container = document.querySelector('.container');
+    const nav = document.createElement('div');
+    nav.className = 'main-nav';
+    
+    nav.innerHTML = `
+        <a href="index.html" class="nav-button">Drawing Page</a>
+        <a href="planning.html" class="nav-button">Planning Page</a>
+    `;
+    
+    // Insert after header
+    const header = document.querySelector('header');
+    header.after(nav);
+    
     // Function to display winners
     function displayWinners() {
         // Clear any existing content
@@ -19,42 +33,93 @@ document.addEventListener('DOMContentLoaded', function() {
             headerImageContainer.innerHTML = '';
         }
         
-        // Retrieve winners data from API
+        // Get winners from localStorage for offline support
+        const localWinners = JSON.parse(localStorage.getItem('winners') || '[]');
+        
+        // Filter out claimed and disqualified winners
+        const activeWinners = localWinners.filter(winner => !winner.claimed && !winner.disqualified);
+        
+        // Display placeholder if no active winners
+        if (activeWinners.length === 0) {
+            winnersDisplay.innerHTML = '<div class="placeholder">Waiting for winners to be announced...</div>';
+            return;
+        }
+        
+        // Format and display each winner
+        activeWinners.forEach((winner, index) => {
+            const winnerCard = document.createElement('div');
+            winnerCard.className = 'winner-card';
+            
+            // Format the drawing time
+            const drawingTime = winner.timestamp || new Date().toLocaleString();
+            
+            winnerCard.innerHTML = `
+                <h2>Winner #${index + 1}</h2>
+                <p class="winner-name">${winner.name || 'Anonymous'}</p>
+                <p class="winner-id">${winner.uniqueId || 'N/A'}</p>
+                <p class="winner-prize">${winner.prize || 'Prize'}</p>
+                <p class="drawing-time">${drawingTime}</p>
+                <p class="winner-session">Session: ${winner.session || 'Default'}</p>
+            `;
+            
+            winnersDisplay.appendChild(winnerCard);
+            
+            // Adding a slight delay for animation effect
+            setTimeout(() => {
+                winnerCard.style.opacity = '1';
+                winnerCard.style.transform = 'translateY(0)';
+            }, 100 * index);
+        });
+        
+        // Also try to fetch from API as a backup
         fetch(`${API_URL}/api/winners`)
             .then(response => response.json())
             .then(winnersData => {
+                // If we already have local winners, don't display API winners
+                if (localWinners.length > 0) return;
+                
                 if (winnersData.length === 0) {
-                    winnersDisplay.innerHTML = '<div class="placeholder">Waiting for winners to be announced...</div>';
+                    if (activeWinners.length === 0) {
+                        winnersDisplay.innerHTML = '<div class="placeholder">Waiting for winners to be announced...</div>';
+                    }
                     return;
                 }
                 
-                // Format and display each winner
-                winnersData.forEach((winner, index) => {
-                    const winnerCard = document.createElement('div');
-                    winnerCard.className = 'winner-card';
+                // Only if we don't have local winners, display API winners
+                if (activeWinners.length === 0) {
+                    winnersDisplay.innerHTML = ''; // Clear placeholder
                     
-                    // Format the drawing time
-                    const drawingDate = new Date(winner.drawingTime);
-                    const formattedDate = drawingDate.toLocaleString();
-                    
-                    winnerCard.innerHTML = `
-                        <h2>Winner #${index + 1}</h2>
-                        <p>${winner.winnerText}</p>
-                        <p class="drawing-time">${formattedDate}</p>
-                    `;
-                    
-                    winnersDisplay.appendChild(winnerCard);
-                    
-                    // Adding a slight delay for animation effect
-                    setTimeout(() => {
-                        winnerCard.style.opacity = '1';
-                        winnerCard.style.transform = 'translateY(0)';
-                    }, 100 * index);
-                });
+                    // Format and display each winner from API
+                    winnersData.forEach((winner, index) => {
+                        const winnerCard = document.createElement('div');
+                        winnerCard.className = 'winner-card';
+                        
+                        // Format the drawing time
+                        const drawingDate = new Date(winner.drawingTime);
+                        const formattedDate = drawingDate.toLocaleString();
+                        
+                        winnerCard.innerHTML = `
+                            <h2>Winner #${index + 1}</h2>
+                            <p>${winner.winnerText}</p>
+                            <p class="drawing-time">${formattedDate}</p>
+                        `;
+                        
+                        winnersDisplay.appendChild(winnerCard);
+                        
+                        // Adding a slight delay for animation effect
+                        setTimeout(() => {
+                            winnerCard.style.opacity = '1';
+                            winnerCard.style.transform = 'translateY(0)';
+                        }, 100 * index);
+                    });
+                }
             })
             .catch(error => {
                 console.error('Error fetching winners:', error);
-                winnersDisplay.innerHTML = '<div class="placeholder">Error loading winners. Please try again later.</div>';
+                // Only show error if we don't have local winners
+                if (activeWinners.length === 0) {
+                    winnersDisplay.innerHTML = '<div class="placeholder">Error loading winners. Please try again later.</div>';
+                }
             });
     }
     
@@ -132,6 +197,14 @@ document.addEventListener('DOMContentLoaded', function() {
     displayWinners();
     initializeTimer();
     
-    // Auto-refresh winners every 10 seconds
-    setInterval(displayWinners, 10000);
+    // Listen for storage events to update winners and timer
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'winners' || e.key === 'casinoHeaderImage') {
+            // Refresh winners display when winners data changes
+            displayWinners();
+        } else if (e.key === 'timerSeconds' || e.key === 'timerRunning' || e.key === 'timerStartTime' || e.key === 'timerDisplay') {
+            // Only update the timer, not the winners list
+            // Timer updates are already handled in initializeTimer()
+        }
+    });
 }); 

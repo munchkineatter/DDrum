@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casino Drawing - Promotion Planning</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Promotion Planning</h1>
+            <nav class="main-nav">
+                <a href="index.html" class="nav-button">Winner Input Page</a>
+                <a href="display.html" target="_blank" class="nav-button">Display Page</a>
+            </nav>
+        </header>
+        
+        <main>
+            <div class="planning-container">
+                <div class="promotion-info">
+                    <h2>Promotion Details</h2>
+                    <div class="form-group">
+                        <label for="promotionName">Promotion Name</label>
+                        <input type="text" id="promotionName" placeholder="Enter promotion name">
+                    </div>
+                    <div class="form-group">
+                        <label for="promotionDate">Date</label>
+                        <input type="date" id="promotionDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="masterTimer">Master Timer (minutes)</label>
+                        <input type="number" id="masterTimer" min="1" max="120" value="5">
+                    </div>
+                    
+                    <div class="prize-management">
+                        <h3>Prize Management</h3>
+                        <div id="prize-list">
+                            <div class="prize-item">
+                                <input type="text" placeholder="Prize name" class="prize-name">
+                                <input type="text" placeholder="Value" class="prize-value">
+                                <button type="button" class="remove-prize">×</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-prize" class="secondary-btn">+ Add Prize</button>
+                    </div>
+                </div>
+                
+                <div class="sessions-container">
+                    <h2>Drawing Sessions</h2>
+                    <div id="sessions-list">
+                        <!-- Sessions will be added here -->
+                    </div>
+                    <button type="button" id="add-session" class="primary-btn">+ Add Drawing Session</button>
+                </div>
+                
+                <div class="timeline-container">
+                    <h2>Timeline</h2>
+                    <div id="timeline-view" class="timeline">
+                        <!-- Timeline will be generated here -->
+                        <div class="timeline-placeholder">Sessions will be visualized here</div>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button type="button" id="save-plan" class="primary-btn">Save Plan</button>
+                    <button type="button" id="load-plan" class="secondary-btn">Load Plan</button>
+                    <button type="button" id="clear-plan" class="danger-btn">Clear Plan</button>
+                </div>
+                
+                <div class="saved-plans-list">
+                    <h3>Saved Plans</h3>
+                    <select id="saved-plans-select">
+                        <option value="">Select a saved plan</option>
+                    </select>
+                    <button type="button" id="delete-plan" class="danger-btn">Delete Selected Plan</button>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>&copy; 2023 Casino Drawing System</p>
+        </footer>
+    </div>
+    
+    <!-- Templates -->
+    <template id="session-template">
+        <div class="session-item" data-id="{{id}}">
+            <div class="session-header">
+                <h3>Session {{number}}</h3>
+                <button type="button" class="remove-session">×</button>
+            </div>
+            <div class="session-content">
+                <div class="form-group">
+                    <label>Time Range</label>
+                    <div class="time-range">
+                        <input type="time" class="session-start-time">
+                        <span>to</span>
+                        <input type="time" class="session-end-time">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Number of Winners</label>
+                    <input type="number" class="session-winners" min="1" value="3">
+                </div>
+                <div class="session-prizes">
+                    <label>Prizes</label>
+                    <div class="session-prizes-list">
+                        <!-- Prize assignments will be added here -->
+                    </div>
+                    <button type="button" class="assign-prize secondary-btn">Assign Prize</button>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <script src="js/planning.js"></script>
+</body>
+</html> 

@@ -10,46 +10,61 @@
     <div class="container">
         <header>
             <h1>Casino Drawing Winner Input</h1>
+            <nav class="main-nav">
+                <a href="index.html" class="nav-button active">Drawing Page</a>
+                <a href="display.html" target="_blank" class="nav-button">Display Page</a>
+                <a href="planning.html" class="nav-button">Planning Page</a>
+            </nav>
         </header>
         
         <main>
-            <form id="winnerForm">
-                <div class="form-group">
-                    <label for="headerImage">Header Image</label>
-                    <input type="file" id="headerImage" accept="image/*" onchange="previewHeaderImage(this)">
-                    <div id="imagePreview" class="image-preview"></div>
-                </div>
-                
-                <div class="form-group timer-controls">
-                    <label for="timerMinutes">Timer (minutes)</label>
-                    <input type="number" id="timerMinutes" min="1" max="60" value="5">
-                    <div class="timer-buttons">
-                        <button type="button" id="startTimer">Start</button>
-                        <button type="button" id="pauseTimer">Pause</button>
-                        <button type="button" id="resetTimer">Reset</button>
-                    </div>
-                </div>
-                
-                <div id="entries-container">
-                    <!-- Winner entry fields will be added here -->
-                </div>
-                
-                <div class="controls">
-                    <button type="button" id="addEntry">Add Winner</button>
-                    <button type="submit" id="submitWinners">Submit Winners</button>
-                    <div class="export-controls">
-                        <button type="button" id="exportCSV">Export CSV</button>
-                        <button type="button" id="clearData" class="danger-btn">Clear All Data</button>
-                    </div>
-                </div>
-            </form>
-            
+            <!-- Display Preview moved to top -->
             <div class="preview-container">
                 <h2>Display Preview</h2>
                 <div id="displayPreview" class="display-preview">
                     <div class="placeholder">Waiting for winners to be added...</div>
                 </div>
             </div>
+            
+            <div class="content-wrapper">
+                <!-- Main Form -->
+                <form id="winnerForm">
+                    <div class="form-group">
+                        <label for="headerImage">Header Image</label>
+                        <input type="file" id="headerImage" accept="image/*" onchange="previewHeaderImage(this)">
+                        <div id="imagePreview" class="image-preview"></div>
+                    </div>
+                    
+                    <div id="entries-container">
+                        <!-- Winner entry fields will be added here -->
+                    </div>
+                    
+                    <div class="controls">
+                        <button type="button" id="addEntry">Add Winner</button>
+                        <button type="submit" id="submitWinners">Submit Winners</button>
+                        <div class="export-controls">
+                            <button type="button" id="exportCSV">Export CSV</button>
+                            <button type="button" id="clearData" class="danger-btn">Clear All Data</button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Timer Controls in floating box -->
+                <div class="timer-control-box">
+                    <h3>Timer Controls</h3>
+                    <div class="form-group timer-controls">
+                        <label for="timerMinutes">Timer Duration (minutes)</label>
+                        <input type="number" id="timerMinutes" min="1" max="60" value="5">
+                        <div class="timer-buttons">
+                            <button type="button" id="startTimer">Start</button>
+                            <button type="button" id="pauseTimer">Pause</button>
+                            <button type="button" id="resetTimer">Reset</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Winners history section will be added dynamically via JavaScript -->
         </main>
         
         <footer>
