@@ -2,28 +2,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const winnersDisplay = document.getElementById('winners-display');
     const headerImageContainer = document.getElementById('headerImageContainer');
     const timerElement = document.getElementById('timer');
+    const promotionHeader = document.getElementById('promotionHeader');
     
     // Set the API URL based on environment
     const API_URL = 'https://casino-drawing-system.onrender.com'; // Actual Render service URL
-    
-    // Add navigation at the top
-    const container = document.querySelector('.container');
-    const nav = document.createElement('div');
-    nav.className = 'main-nav';
-    
-    nav.innerHTML = `
-        <a href="index.html" class="nav-button">Drawing Page</a>
-        <a href="planning.html" class="nav-button">Planning Page</a>
-    `;
-    
-    // Insert after header
-    const header = document.querySelector('header');
-    header.after(nav);
     
     // Function to display winners
     function displayWinners() {
         // Clear any existing content
         winnersDisplay.innerHTML = '';
+        
+        // Set promotion name if available
+        const activePlan = JSON.parse(localStorage.getItem('activePlan') || '{}');
+        if (activePlan.name) {
+            promotionHeader.textContent = activePlan.name;
+        }
         
         // Display header image if available
         const headerImage = localStorage.getItem('casinoHeaderImage');
@@ -199,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Listen for storage events to update winners and timer
     window.addEventListener('storage', function(e) {
-        if (e.key === 'winners' || e.key === 'casinoHeaderImage') {
+        if (e.key === 'winners' || e.key === 'casinoHeaderImage' || e.key === 'activePlan') {
             // Refresh winners display when winners data changes
             displayWinners();
         } else if (e.key === 'timerSeconds' || e.key === 'timerRunning' || e.key === 'timerStartTime' || e.key === 'timerDisplay') {

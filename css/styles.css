@@ -61,18 +61,32 @@ header h1 {
 }
 
 .winner-entry {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px dashed #333;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: var(--card-bg);
+    border-radius: 4px;
+    position: relative;
 }
 
-@media (max-width: 768px) {
-    .winner-entry {
-        grid-template-columns: 1fr;
-    }
+.winner-entry .form-group {
+    margin-bottom: 5px;
+}
+
+.winner-entry input, 
+.winner-entry select {
+    padding: 6px 8px;
+    height: 32px;
+}
+
+.winner-entry label {
+    font-size: 0.9rem;
+}
+
+.remove-entry {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    line-height: 1;
 }
 
 .form-group {
@@ -127,16 +141,6 @@ button:hover {
     background: var(--primary-hover);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-.remove-entry {
-    background: var(--danger-color);
-    font-size: 0.8rem;
-    padding: 4px 8px;
-}
-
-.remove-entry:hover {
-    background: #cc0000;
 }
 
 .danger-btn {
@@ -776,4 +780,80 @@ footer {
     .timeline {
         height: 150px;
     }
+}
+
+/* Display page updates */
+#display-container {
+    position: relative;
+    width: 100%;
+}
+
+.timer-display {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    font-size: 2.5rem;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 200, 255, 0.4);
+}
+
+/* Winners preview fixes */
+#displayPreview .winner-card {
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+#displayPreview .winner-card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+}
+
+/* Bulk session creation styles */
+.bulk-session-creator {
+    background: rgba(30, 30, 30, 0.5);
+    border-left: 4px solid var(--primary-color);
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+.bulk-session-creator h3 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+}
+
+.bulk-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+@media (max-width: 768px) {
+    .bulk-options {
+        grid-template-columns: 1fr;
+    }
+}
+
+.interval-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.interval-selector input {
+    width: 70px;
+}
+
+.repeat-prize-button {
+    margin-left: 10px;
+    background: var(--primary-color);
+    color: var(--dark-bg);
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border-radius: 3px;
 } 

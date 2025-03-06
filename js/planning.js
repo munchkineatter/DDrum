@@ -11,6 +11,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedPlansSelect = document.getElementById('saved-plans-select');
     const timelineView = document.getElementById('timeline-view');
     
+    // Bulk session creation elements
+    const bulkStartTime = document.getElementById('bulk-start-time');
+    const bulkEndTime = document.getElementById('bulk-end-time');
+    const intervalValue = document.getElementById('interval-value');
+    const intervalUnit = document.getElementById('interval-unit');
+    const winnersPerSession = document.getElementById('winners-per-session');
+    const createSessionsBtn = document.getElementById('create-sessions');
+    
     // Session template
     const sessionTemplate = document.getElementById('session-template');
     
@@ -20,53 +28,65 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPlan = {
         name: '',
         date: '',
+        activeSession: '',
         masterTimer: 5,
-        prizes: [],
-        sessions: []
+        sessions: [],
+        prizes: []
     };
     
-    // Initialize
-    loadSavedPlansList();
+    // Set current date
     setCurrentDate();
+    
+    // Load saved plans list
+    loadSavedPlansList();
+    
+    // Event listeners
+    addSessionBtn.addEventListener('click', addSession);
+    addPrizeBtn.addEventListener('click', addPrize);
+    savePlanBtn.addEventListener('click', savePlan);
+    loadPlanBtn.addEventListener('click', loadPlan);
+    clearPlanBtn.addEventListener('click', () => clearPlan(true));
+    deletePlanBtn.addEventListener('click', deletePlan);
+    createSessionsBtn.addEventListener('click', createBulkSessions);
+    
+    // Set promotion name for display header
+    document.getElementById('promotionName').addEventListener('input', function() {
+        const name = this.value;
+        currentPlan.name = name;
+        
+        // Update active plan with new name
+        const activePlan = JSON.parse(localStorage.getItem('activePlan') || '{}');
+        activePlan.name = name;
+        localStorage.setItem('activePlan', JSON.stringify(activePlan));
+    });
     
     // Set current date in date picker
     function setCurrentDate() {
-        const today = new Date();
-        const formattedDate = today.toISOString().substr(0, 10);
-        document.getElementById('promotionDate').value = formattedDate;
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('promotionDate').value = today;
+        currentPlan.date = today;
     }
     
-    // Add new session
+    // Add a new session
     function addSession() {
-        const sessionId = sessionCount++;
-        const sessionNumber = sessionCount;
+        sessionCount++;
+        const sessionId = 'session-' + Date.now();
         
-        // Clone template
-        const sessionContent = document.importNode(sessionTemplate.content, true);
+        const fragment = document.createRange().createContextualFragment(
+            sessionTemplate.innerHTML
+                .replace(/{{id}}/g, sessionId)
+                .replace(/{{number}}/g, sessionCount)
+        );
         
-        // Update template placeholders
-        sessionContent.querySelector('.session-item').dataset.id = sessionId;
-        sessionContent.querySelector('.session-header h3').textContent = `Session ${sessionNumber}`;
+        sessionsList.appendChild(fragment);
         
-        // Add to DOM
-        sessionsList.appendChild(sessionContent);
+        const sessionItem = sessionsList.querySelector(`[data-id="${sessionId}"]`);
         
-        // Add event listeners
-        const sessionItem = sessionsList.querySelector(`.session-item[data-id="${sessionId}"]`);
-        const removeBtn = sessionItem.querySelector('.remove-session');
-        const assignPrizeBtn = sessionItem.querySelector('.assign-prize');
+        // Set up event listeners for this session
+        setupSessionEvents(sessionItem, sessionId);
         
-        removeBtn.addEventListener('click', function() {
-            sessionItem.remove();
-            updateTimeline();
-        });
-        
-        assignPrizeBtn.addEventListener('click', function() {
-            assignPrizeToSession(sessionId);
-        });
-        
-        // Set default times
-        setupDefaultTimes(sessionItem, sessionNumber);
+        // Set default times based on session number
+        setupDefaultTimes(sessionItem, sessionCount);
         
         // Update timeline
         updateTimeline();
@@ -74,399 +94,673 @@ document.addEventListener('DOMContentLoaded', function() {
         return sessionId;
     }
     
-    // Setup default times based on session number
-    function setupDefaultTimes(sessionItem, sessionNumber) {
-        const startTimeInput = sessionItem.querySelector('.session-start-time');
-        const endTimeInput = sessionItem.querySelector('.session-end-time');
+    // Create bulk sessions
+    function createBulkSessions() {
+        const startTime = bulkStartTime.value;
+        const endTime = bulkEndTime.value;
+        const interval = parseInt(intervalValue.value) || 60;
+        const unit = intervalUnit.value;
+        const winners = parseInt(winnersPerSession.value) || 1;
         
-        // Set default times (1 hour sessions starting at 6 PM)
-        const baseHour = 18; // 6 PM
-        const startHour = baseHour + (sessionNumber - 1);
-        const endHour = startHour + 1;
+        if (!startTime || !endTime) {
+            alert('Please set both start and end times');
+            return;
+        }
         
-        startTimeInput.value = `${startHour.toString().padStart(2, '0')}:00`;
-        endTimeInput.value = `${endHour.toString().padStart(2, '0')}:00`;
+        // Convert times to minutes since midnight
+        const startMinutes = timeToMinutes(startTime);
+        const endMinutes = timeToMinutes(endTime);
         
-        // Add listeners for time changes
-        startTimeInput.addEventListener('change', updateTimeline);
-        endTimeInput.addEventListener('change', updateTimeline);
+        if (startMinutes >= endMinutes) {
+            alert('End time must be after start time');
+            return;
+        }
+        
+        // Calculate interval in minutes
+        const intervalMinutes = unit === 'hours' ? interval * 60 : interval;
+        
+        // Clear existing sessions if user confirms
+        if (sessionsList.childElementCount > 0) {
+            if (confirm('This will replace all existing sessions. Continue?')) {
+                sessionsList.innerHTML = '';
+                sessionCount = 0;
+            } else {
+                return;
+            }
+        }
+        
+        // Create sessions at regular intervals
+        let currentTime = startMinutes;
+        let sessionIds = [];
+        
+        while (currentTime < endMinutes) {
+            const sessionStart = minutesToTime(currentTime);
+            const sessionEnd = minutesToTime(Math.min(currentTime + intervalMinutes, endMinutes));
+            
+            // Create a new session
+            const sessionId = addSession();
+            sessionIds.push(sessionId);
+            
+            // Set the times and winners
+            const sessionItem = sessionsList.querySelector(`[data-id="${sessionId}"]`);
+            sessionItem.querySelector('.session-start-time').value = sessionStart;
+            sessionItem.querySelector('.session-end-time').value = sessionEnd;
+            sessionItem.querySelector('.session-winners').value = winners;
+            
+            // Move to next interval
+            currentTime += intervalMinutes;
+        }
+        
+        // Update timeline
+        updateTimeline();
+        
+        return sessionIds;
     }
     
-    // Add new prize
+    // Convert time string (HH:MM) to minutes since midnight
+    function timeToMinutes(timeStr) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return (hours * 60) + minutes;
+    }
+    
+    // Convert minutes since midnight to time string (HH:MM)
+    function minutesToTime(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    }
+    
+    // Set up event listeners for a session
+    function setupSessionEvents(sessionItem, sessionId) {
+        // Remove session button
+        sessionItem.querySelector('.remove-session').addEventListener('click', function() {
+            sessionItem.remove();
+            updateTimeline();
+        });
+        
+        // Time and winners inputs
+        const timeInputs = sessionItem.querySelectorAll('input[type="time"], .session-winners');
+        timeInputs.forEach(input => {
+            input.addEventListener('change', updateTimeline);
+        });
+        
+        // Assign prize button
+        sessionItem.querySelector('.assign-prize').addEventListener('click', function() {
+            assignPrizeToSession(sessionId);
+        });
+    }
+    
+    // Set default times based on session number
+    function setupDefaultTimes(sessionItem, sessionNumber) {
+        // Base times on session number - default 1 hour apart
+        const baseHour = 10 + Math.floor((sessionNumber - 1) / 2);
+        const startTime = `${baseHour.toString().padStart(2, '0')}:00`;
+        const endTime = `${(baseHour + 1).toString().padStart(2, '0')}:00`;
+        
+        sessionItem.querySelector('.session-start-time').value = startTime;
+        sessionItem.querySelector('.session-end-time').value = endTime;
+    }
+    
+    // Add a new prize
     function addPrize() {
+        prizeCount++;
+        
         const prizeItem = document.createElement('div');
         prizeItem.className = 'prize-item';
-        prizeItem.dataset.id = prizeCount++;
-        
         prizeItem.innerHTML = `
             <input type="text" placeholder="Prize name" class="prize-name">
             <input type="text" placeholder="Value" class="prize-value">
             <button type="button" class="remove-prize">×</button>
+            <button type="button" class="repeat-prize-button">Apply to all sessions</button>
         `;
         
         prizeList.appendChild(prizeItem);
         
-        const removeBtn = prizeItem.querySelector('.remove-prize');
-        removeBtn.addEventListener('click', function() {
+        // Setup remove button
+        prizeItem.querySelector('.remove-prize').addEventListener('click', function() {
             prizeItem.remove();
         });
         
-        return prizeItem;
+        // Setup repeat prize button
+        prizeItem.querySelector('.repeat-prize-button').addEventListener('click', function() {
+            const prizeName = prizeItem.querySelector('.prize-name').value;
+            const prizeValue = prizeItem.querySelector('.prize-value').value;
+            
+            if (!prizeName) {
+                alert('Please enter a prize name first');
+                return;
+            }
+            
+            // Apply this prize to all sessions
+            const sessions = document.querySelectorAll('.session-item');
+            if (confirm(`Apply "${prizeName}" to all ${sessions.length} sessions?`)) {
+                sessions.forEach(session => {
+                    const sessionId = session.getAttribute('data-id');
+                    const prizesList = session.querySelector('.session-prizes-list');
+                    
+                    // Create prize selection item
+                    const prizeSelectionItem = document.createElement('div');
+                    prizeSelectionItem.className = 'prize-selection';
+                    prizeSelectionItem.innerHTML = `
+                        <span>${prizeName} ${prizeValue ? `($${prizeValue})` : ''}</span>
+                        <button type="button" class="remove-prize">×</button>
+                    `;
+                    
+                    // Add remove button event
+                    prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
+                        prizeSelectionItem.remove();
+                    });
+                    
+                    prizesList.appendChild(prizeSelectionItem);
+                });
+                
+                alert(`Prize "${prizeName}" has been applied to all sessions`);
+            }
+        });
     }
     
-    // Assign prize to session
+    // Assign prize to a session
     function assignPrizeToSession(sessionId) {
         const sessionItem = document.querySelector(`.session-item[data-id="${sessionId}"]`);
-        const prizesList = sessionItem.querySelector('.session-prizes-list');
-        const winners = parseInt(sessionItem.querySelector('.session-winners').value);
+        if (!sessionItem) return;
         
-        // Clear existing prizes
-        prizesList.innerHTML = '';
+        const prizeItems = document.querySelectorAll('#prize-list .prize-item');
+        if (prizeItems.length === 0) {
+            alert('Please add prizes first');
+            return;
+        }
         
-        // Get available prizes
-        const availablePrizes = Array.from(document.querySelectorAll('.prize-item')).map(item => {
-            return {
-                id: item.dataset.id,
-                name: item.querySelector('.prize-name').value || 'Prize',
-                value: item.querySelector('.prize-value').value || '$0'
-            };
+        // Build prizes list
+        let prizesOptions = [];
+        prizeItems.forEach(item => {
+            const name = item.querySelector('.prize-name').value;
+            const value = item.querySelector('.prize-value').value;
+            
+            if (name) {
+                prizesOptions.push({ name, value });
+            }
         });
         
-        // Add prize selections
-        for (let i = 0; i < winners; i++) {
-            const prizeSelect = document.createElement('div');
-            prizeSelect.className = 'prize-selection';
-            
-            prizeSelect.innerHTML = `
-                <label>Winner #${i + 1} Prize:</label>
-                <select class="prize-select" data-winner="${i}">
-                    <option value="">Select a prize</option>
-                    ${availablePrizes.map(prize => 
-                        `<option value="${prize.id}">${prize.name} (${prize.value})</option>`
-                    ).join('')}
-                </select>
-            `;
-            
-            prizesList.appendChild(prizeSelect);
+        if (prizesOptions.length === 0) {
+            alert('Please add at least one prize with a name');
+            return;
         }
+        
+        // Ask user to select a prize
+        const prizeIndex = prompt(
+            `Select a prize to assign (1-${prizesOptions.length}):\n` +
+            prizesOptions.map((prize, i) => 
+                `${i + 1}. ${prize.name} ${prize.value ? `($${prize.value})` : ''}`
+            ).join('\n')
+        );
+        
+        if (!prizeIndex) return;
+        
+        const selectedIndex = parseInt(prizeIndex) - 1;
+        if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= prizesOptions.length) {
+            alert('Invalid selection');
+            return;
+        }
+        
+        const selectedPrize = prizesOptions[selectedIndex];
+        
+        // Add prize to session
+        const sessionPrizesList = sessionItem.querySelector('.session-prizes-list');
+        const prizeSelectionItem = document.createElement('div');
+        prizeSelectionItem.className = 'prize-selection';
+        prizeSelectionItem.innerHTML = `
+            <span>${selectedPrize.name} ${selectedPrize.value ? `($${selectedPrize.value})` : ''}</span>
+            <button type="button" class="remove-prize">×</button>
+        `;
+        
+        // Add remove button event
+        prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
+            prizeSelectionItem.remove();
+        });
+        
+        sessionPrizesList.appendChild(prizeSelectionItem);
     }
     
     // Update timeline visualization
     function updateTimeline() {
+        const sessionItems = document.querySelectorAll('.session-item');
+        
+        // Clear timeline
         timelineView.innerHTML = '';
         
-        const sessions = Array.from(document.querySelectorAll('.session-item'));
-        
-        if (sessions.length === 0) {
+        if (sessionItems.length === 0) {
             timelineView.innerHTML = '<div class="timeline-placeholder">Sessions will be visualized here</div>';
             return;
         }
         
         // Find earliest and latest times
-        let earliestTime = '23:59';
-        let latestTime = '00:00';
+        let earliestMinutes = 24 * 60;
+        let latestMinutes = 0;
         
-        sessions.forEach(session => {
+        sessionItems.forEach(session => {
             const startTime = session.querySelector('.session-start-time').value;
             const endTime = session.querySelector('.session-end-time').value;
             
-            if (startTime && startTime < earliestTime) earliestTime = startTime;
-            if (endTime && endTime > latestTime) latestTime = endTime;
+            if (startTime) {
+                const minutes = timeToMinutes(startTime);
+                earliestMinutes = Math.min(earliestMinutes, minutes);
+            }
+            
+            if (endTime) {
+                const minutes = timeToMinutes(endTime);
+                latestMinutes = Math.max(latestMinutes, minutes);
+            }
         });
         
-        // Create timeline
+        // Ensure we have valid time range
+        if (earliestMinutes >= latestMinutes) {
+            timelineView.innerHTML = '<div class="timeline-placeholder">Please set valid time ranges for sessions</div>';
+            return;
+        }
+        
+        // Add padding to time range
+        earliestMinutes = Math.max(0, earliestMinutes - 30);
+        latestMinutes = Math.min(24 * 60, latestMinutes + 30);
+        
+        // Create timeline period
         const timelinePeriod = document.createElement('div');
         timelinePeriod.className = 'timeline-period';
-        timelinePeriod.innerHTML = `<div class="timeline-scale">
-            <span class="timeline-start">${formatTime(earliestTime)}</span>
-            <span class="timeline-end">${formatTime(latestTime)}</span>
-        </div>`;
         
+        // Add scale markers
+        const timelineScale = document.createElement('div');
+        timelineScale.className = 'timeline-scale';
+        
+        // Calculate how many hours to show
+        const totalHours = Math.ceil((latestMinutes - earliestMinutes) / 60);
+        const startHour = Math.floor(earliestMinutes / 60);
+        
+        for (let i = 0; i <= totalHours; i++) {
+            const hour = startHour + i;
+            const marker = document.createElement('span');
+            marker.textContent = `${hour}:00`;
+            timelineScale.appendChild(marker);
+        }
+        
+        timelinePeriod.appendChild(timelineScale);
+        
+        // Create slots container
         const timelineSlots = document.createElement('div');
         timelineSlots.className = 'timeline-slots';
         
-        // Add sessions to timeline
-        sessions.forEach((session, idx) => {
+        // Add session blocks to timeline
+        sessionItems.forEach(session => {
+            const sessionId = session.getAttribute('data-id');
             const startTime = session.querySelector('.session-start-time').value;
             const endTime = session.querySelector('.session-end-time').value;
-            const sessionId = session.dataset.id;
-            const numWinners = session.querySelector('.session-winners').value;
+            const winners = session.querySelector('.session-winners').value || '1';
             
-            if (startTime && endTime) {
-                const [startHour, startMin] = startTime.split(':').map(Number);
-                const [endHour, endMin] = endTime.split(':').map(Number);
-                
-                const [earliestHour, earliestMin] = earliestTime.split(':').map(Number);
-                const [latestHour, latestMin] = latestTime.split(':').map(Number);
-                
-                // Calculate position and width percentages
-                const totalMinutes = (latestHour * 60 + latestMin) - (earliestHour * 60 + earliestMin);
-                const startMinutes = (startHour * 60 + startMin) - (earliestHour * 60 + earliestMin);
-                const sessionDuration = (endHour * 60 + endMin) - (startHour * 60 + startMin);
-                
-                const leftPosition = (startMinutes / totalMinutes) * 100;
-                const width = (sessionDuration / totalMinutes) * 100;
-                
-                const timelineSession = document.createElement('div');
-                timelineSession.className = 'timeline-session';
-                timelineSession.style.left = `${leftPosition}%`;
-                timelineSession.style.width = `${width}%`;
-                timelineSession.dataset.id = sessionId;
-                
-                timelineSession.innerHTML = `
-                    <div class="timeline-session-label">Session ${idx + 1}</div>
-                    <div class="timeline-session-time">${formatTime(startTime)} - ${formatTime(endTime)}</div>
-                    <div class="timeline-session-winners">${numWinners} winners</div>
-                `;
-                
-                timelineSlots.appendChild(timelineSession);
-                
-                // Add click event to highlight corresponding session
-                timelineSession.addEventListener('click', function() {
-                    document.querySelectorAll('.session-item').forEach(item => {
-                        item.classList.remove('active');
-                    });
-                    document.querySelector(`.session-item[data-id="${sessionId}"]`).classList.add('active');
-                    document.querySelector(`.session-item[data-id="${sessionId}"]`).scrollIntoView({ behavior: 'smooth' });
-                });
-            }
+            if (!startTime || !endTime) return;
+            
+            const startMinutes = timeToMinutes(startTime);
+            const endMinutes = timeToMinutes(endTime);
+            
+            if (startMinutes >= endMinutes) return;
+            
+            // Calculate position and width
+            const totalTimelineMinutes = latestMinutes - earliestMinutes;
+            const left = ((startMinutes - earliestMinutes) / totalTimelineMinutes) * 100;
+            const width = ((endMinutes - startMinutes) / totalTimelineMinutes) * 100;
+            
+            // Create session block
+            const sessionBlock = document.createElement('div');
+            sessionBlock.className = 'timeline-session';
+            sessionBlock.style.left = `${left}%`;
+            sessionBlock.style.width = `${width}%`;
+            
+            // Get session number
+            const sessionNumber = session.querySelector('.session-header h3').textContent.replace('Session ', '');
+            
+            sessionBlock.innerHTML = `
+                <div class="timeline-session-label">Session ${sessionNumber}</div>
+                <div class="timeline-session-time">${formatTime(startTime)} - ${formatTime(endTime)}</div>
+                <div class="timeline-session-winners">${winners} winner${winners > 1 ? 's' : ''}</div>
+            `;
+            
+            // Highlight when clicked
+            sessionBlock.addEventListener('click', function() {
+                // Remove active class from all sessions
+                document.querySelectorAll('.session-item').forEach(s => s.classList.remove('active'));
+                // Add active class to this session
+                session.classList.add('active');
+                session.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+            
+            timelineSlots.appendChild(sessionBlock);
         });
         
         timelinePeriod.appendChild(timelineSlots);
         timelineView.appendChild(timelinePeriod);
     }
     
-    // Format time for display
+    // Format time for display (convert 24h to 12h format)
     function formatTime(timeString) {
         if (!timeString) return '';
         
         const [hours, minutes] = timeString.split(':');
-        const hour = parseInt(hours);
-        const period = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour % 12 || 12;
+        let hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
         
-        return `${displayHour}:${minutes} ${period}`;
+        hour = hour % 12;
+        hour = hour ? hour : 12; // Convert 0 to 12
+        
+        return `${hour}:${minutes} ${ampm}`;
     }
     
     // Save current plan
     function savePlan() {
-        // Gather promotion info
-        currentPlan.name = document.getElementById('promotionName').value || 'Unnamed Promotion';
+        const planName = document.getElementById('promotionName').value;
+        if (!planName) {
+            alert('Please enter a promotion name');
+            return;
+        }
+        
+        // Gather promotion details
+        currentPlan.name = planName;
         currentPlan.date = document.getElementById('promotionDate').value;
         currentPlan.masterTimer = parseInt(document.getElementById('masterTimer').value) || 5;
         
-        // Gather prizes
-        currentPlan.prizes = Array.from(document.querySelectorAll('.prize-item')).map(item => {
-            return {
-                id: item.dataset.id,
-                name: item.querySelector('.prize-name').value || 'Prize',
-                value: item.querySelector('.prize-value').value || '$0'
-            };
-        });
-        
         // Gather sessions
-        currentPlan.sessions = Array.from(document.querySelectorAll('.session-item')).map((session, idx) => {
-            const sessionId = session.dataset.id;
+        currentPlan.sessions = [];
+        document.querySelectorAll('.session-item').forEach(session => {
+            const sessionId = session.getAttribute('data-id');
+            const sessionNumber = session.querySelector('.session-header h3').textContent.replace('Session ', '');
             const startTime = session.querySelector('.session-start-time').value;
             const endTime = session.querySelector('.session-end-time').value;
-            const winnersCount = parseInt(session.querySelector('.session-winners').value) || 1;
+            const winners = parseInt(session.querySelector('.session-winners').value) || 1;
             
-            // Get prize assignments
-            const prizeAssignments = Array.from(session.querySelectorAll('.prize-select')).map(select => {
-                return {
-                    winnerId: select.dataset.winner,
-                    prizeId: select.value
-                };
+            // Gather prizes
+            const prizes = [];
+            session.querySelectorAll('.prize-selection').forEach(prizeSelection => {
+                const prizeText = prizeSelection.querySelector('span').textContent;
+                // Extract name and value from text
+                let name = prizeText;
+                let value = '';
+                
+                const valueMatch = prizeText.match(/\(\$([^)]+)\)/);
+                if (valueMatch) {
+                    name = prizeText.replace(valueMatch[0], '').trim();
+                    value = valueMatch[1];
+                }
+                
+                prizes.push({
+                    name,
+                    value,
+                    assigned: false
+                });
             });
             
-            return {
+            currentPlan.sessions.push({
                 id: sessionId,
-                number: idx + 1,
+                number: sessionNumber,
                 startTime,
                 endTime,
-                winnersCount,
-                prizeAssignments
-            };
+                winners,
+                prizes
+            });
+        });
+        
+        // Gather prizes
+        currentPlan.prizes = [];
+        document.querySelectorAll('#prize-list .prize-item').forEach(prizeItem => {
+            const name = prizeItem.querySelector('.prize-name').value;
+            const value = prizeItem.querySelector('.prize-value').value;
+            
+            if (name) {
+                currentPlan.prizes.push({
+                    name,
+                    value,
+                    assigned: false
+                });
+            }
         });
         
         // Save to localStorage
-        const savedPlans = JSON.parse(localStorage.getItem('casinoDrawingPlans') || '[]');
-        const planKey = `plan_${Date.now()}`;
-        
-        savedPlans.push({
-            key: planKey,
-            name: currentPlan.name,
-            date: currentPlan.date,
-            timestamp: Date.now()
-        });
-        
+        const savedPlans = JSON.parse(localStorage.getItem('casinoDrawingPlans') || '{}');
+        savedPlans[planName] = currentPlan;
         localStorage.setItem('casinoDrawingPlans', JSON.stringify(savedPlans));
-        localStorage.setItem(planKey, JSON.stringify(currentPlan));
         
-        alert(`Plan "${currentPlan.name}" saved successfully!`);
+        // Save as active plan
+        localStorage.setItem('activePlan', JSON.stringify(currentPlan));
+        
+        // Update saved plans list
         loadSavedPlansList();
+        
+        alert(`Plan "${planName}" saved successfully`);
     }
     
     // Load saved plans list
     function loadSavedPlansList() {
-        const savedPlans = JSON.parse(localStorage.getItem('casinoDrawingPlans') || '[]');
+        const savedPlans = JSON.parse(localStorage.getItem('casinoDrawingPlans') || '{}');
+        const planNames = Object.keys(savedPlans);
         
-        // Clear options except the first one
-        while (savedPlansSelect.options.length > 1) {
-            savedPlansSelect.remove(1);
-        }
+        // Clear select options
+        savedPlansSelect.innerHTML = '<option value="">Select a saved plan</option>';
         
-        // Add saved plans to dropdown
-        savedPlans.forEach(plan => {
+        // Add options for each saved plan
+        planNames.forEach(name => {
             const option = document.createElement('option');
-            option.value = plan.key;
-            option.textContent = `${plan.name} (${new Date(plan.timestamp).toLocaleDateString()})`;
+            option.value = name;
+            option.textContent = name;
             savedPlansSelect.appendChild(option);
         });
     }
     
-    // Load selected plan
+    // Load plan
     function loadPlan() {
-        const planKey = savedPlansSelect.value;
-        
-        if (!planKey) {
+        const planName = savedPlansSelect.value;
+        if (!planName) {
             alert('Please select a plan to load');
             return;
         }
         
-        try {
-            const plan = JSON.parse(localStorage.getItem(planKey));
-            
-            if (!plan) {
-                alert('Failed to load plan. The plan may have been deleted.');
-                return;
-            }
-            
-            // Confirm before loading
-            if (!confirm(`Are you sure you want to load plan "${plan.name}"? This will overwrite your current work.`)) {
-                return;
-            }
-            
-            // Clear current plan
-            clearPlan(false);
-            
-            // Set plan details
-            document.getElementById('promotionName').value = plan.name;
-            document.getElementById('promotionDate').value = plan.date;
-            document.getElementById('masterTimer').value = plan.masterTimer;
-            
-            // Add prizes
-            prizeList.innerHTML = '';
-            plan.prizes.forEach(prize => {
-                const prizeItem = addPrize();
-                prizeItem.dataset.id = prize.id;
-                prizeItem.querySelector('.prize-name').value = prize.name;
-                prizeItem.querySelector('.prize-value').value = prize.value;
-            });
-            
-            // Add sessions
-            plan.sessions.forEach(session => {
-                const sessionId = addSession();
-                const sessionItem = document.querySelector(`.session-item[data-id="${sessionId}"]`);
-                
-                sessionItem.querySelector('.session-start-time').value = session.startTime;
-                sessionItem.querySelector('.session-end-time').value = session.endTime;
-                sessionItem.querySelector('.session-winners').value = session.winnersCount;
-                
-                // Assign prizes (if any)
-                if (session.prizeAssignments && session.prizeAssignments.length > 0) {
-                    assignPrizeToSession(sessionId);
-                    
-                    // Set selected prizes
-                    session.prizeAssignments.forEach(assignment => {
-                        const select = sessionItem.querySelector(`.prize-select[data-winner="${assignment.winnerId}"]`);
-                        if (select) select.value = assignment.prizeId;
-                    });
-                }
-            });
-            
-            updateTimeline();
-            alert(`Plan "${plan.name}" loaded successfully!`);
-            
-            // Update current plan
-            currentPlan = plan;
-            
-        } catch (error) {
-            console.error('Error loading plan:', error);
-            alert('An error occurred while loading the plan.');
-        }
-    }
-    
-    // Clear current plan
-    function clearPlan(confirm = true) {
-        if (confirm && !window.confirm('Are you sure you want to clear all plan data? This cannot be undone.')) {
+        const savedPlans = JSON.parse(localStorage.getItem('casinoDrawingPlans') || '{}');
+        if (!savedPlans[planName]) {
+            alert(`Plan "${planName}" not found`);
             return;
         }
         
-        // Reset form
-        document.getElementById('promotionName').value = '';
-        setCurrentDate();
-        document.getElementById('masterTimer').value = 5;
+        // Confirm if we have unsaved changes
+        if (document.querySelectorAll('.session-item').length > 0 ||
+            document.querySelectorAll('#prize-list .prize-item').length > 1) {
+            if (!confirm('This will overwrite any unsaved changes. Continue?')) {
+                return;
+            }
+        }
         
-        // Clear prizes
-        prizeList.innerHTML = '';
-        addPrize();
+        // Clear current plan
+        clearPlan(false);
+        
+        // Load plan data
+        currentPlan = savedPlans[planName];
+        
+        // Set promotion details
+        document.getElementById('promotionName').value = currentPlan.name;
+        document.getElementById('promotionDate').value = currentPlan.date || '';
+        document.getElementById('masterTimer').value = currentPlan.masterTimer || 5;
+        
+        // Add prizes
+        prizeList.innerHTML = ''; // Clear prizes
+        if (currentPlan.prizes && currentPlan.prizes.length > 0) {
+            currentPlan.prizes.forEach(prize => {
+                const prizeItem = document.createElement('div');
+                prizeItem.className = 'prize-item';
+                prizeItem.innerHTML = `
+                    <input type="text" placeholder="Prize name" class="prize-name" value="${prize.name}">
+                    <input type="text" placeholder="Value" class="prize-value" value="${prize.value}">
+                    <button type="button" class="remove-prize">×</button>
+                    <button type="button" class="repeat-prize-button">Apply to all sessions</button>
+                `;
+                
+                prizeList.appendChild(prizeItem);
+                
+                // Setup remove button
+                prizeItem.querySelector('.remove-prize').addEventListener('click', function() {
+                    prizeItem.remove();
+                });
+                
+                // Setup repeat prize button
+                prizeItem.querySelector('.repeat-prize-button').addEventListener('click', function() {
+                    const prizeName = prizeItem.querySelector('.prize-name').value;
+                    const prizeValue = prizeItem.querySelector('.prize-value').value;
+                    
+                    if (!prizeName) {
+                        alert('Please enter a prize name first');
+                        return;
+                    }
+                    
+                    // Apply this prize to all sessions
+                    const sessions = document.querySelectorAll('.session-item');
+                    if (confirm(`Apply "${prizeName}" to all ${sessions.length} sessions?`)) {
+                        sessions.forEach(session => {
+                            const sessionId = session.getAttribute('data-id');
+                            const prizesList = session.querySelector('.session-prizes-list');
+                            
+                            // Create prize selection item
+                            const prizeSelectionItem = document.createElement('div');
+                            prizeSelectionItem.className = 'prize-selection';
+                            prizeSelectionItem.innerHTML = `
+                                <span>${prizeName} ${prizeValue ? `($${prizeValue})` : ''}</span>
+                                <button type="button" class="remove-prize">×</button>
+                            `;
+                            
+                            // Add remove button event
+                            prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
+                                prizeSelectionItem.remove();
+                            });
+                            
+                            prizesList.appendChild(prizeSelectionItem);
+                        });
+                        
+                        alert(`Prize "${prizeName}" has been applied to all sessions`);
+                    }
+                });
+            });
+        } else {
+            // Add at least one empty prize
+            addPrize();
+        }
+        
+        // Add sessions
+        sessionsList.innerHTML = ''; // Clear sessions
+        sessionCount = 0;
+        
+        if (currentPlan.sessions && currentPlan.sessions.length > 0) {
+            currentPlan.sessions.forEach(session => {
+                sessionCount++;
+                const sessionId = session.id || ('session-' + Date.now() + sessionCount);
+                
+                const fragment = document.createRange().createContextualFragment(
+                    sessionTemplate.innerHTML
+                        .replace(/{{id}}/g, sessionId)
+                        .replace(/{{number}}/g, session.number || sessionCount)
+                );
+                
+                sessionsList.appendChild(fragment);
+                
+                const sessionItem = sessionsList.querySelector(`[data-id="${sessionId}"]`);
+                
+                // Set up event listeners for this session
+                setupSessionEvents(sessionItem, sessionId);
+                
+                // Set session details
+                sessionItem.querySelector('.session-start-time').value = session.startTime || '';
+                sessionItem.querySelector('.session-end-time').value = session.endTime || '';
+                sessionItem.querySelector('.session-winners').value = session.winners || 1;
+                
+                // Add prizes to session
+                const prizesList = sessionItem.querySelector('.session-prizes-list');
+                if (session.prizes && session.prizes.length > 0) {
+                    session.prizes.forEach(prize => {
+                        const prizeSelectionItem = document.createElement('div');
+                        prizeSelectionItem.className = 'prize-selection';
+                        prizeSelectionItem.innerHTML = `
+                            <span>${prize.name} ${prize.value ? `($${prize.value})` : ''}</span>
+                            <button type="button" class="remove-prize">×</button>
+                        `;
+                        
+                        // Add remove button event
+                        prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
+                            prizeSelectionItem.remove();
+                        });
+                        
+                        prizesList.appendChild(prizeSelectionItem);
+                    });
+                }
+            });
+        }
+        
+        // Update timeline
+        updateTimeline();
+        
+        // Set as active plan
+        localStorage.setItem('activePlan', JSON.stringify(currentPlan));
+        
+        alert(`Plan "${planName}" loaded successfully`);
+    }
+    
+    // Clear plan
+    function clearPlan(confirm = true) {
+        if (confirm && !window.confirm('Are you sure you want to clear all plan data?')) {
+            return;
+        }
+        
+        // Clear promotion details
+        document.getElementById('promotionName').value = '';
+        document.getElementById('promotionDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('masterTimer').value = 5;
         
         // Clear sessions
         sessionsList.innerHTML = '';
         sessionCount = 0;
         
+        // Clear prizes but keep one empty prize
+        prizeList.innerHTML = '';
+        prizeCount = 0;
+        addPrize();
+        
         // Clear timeline
         updateTimeline();
         
-        // Reset plan
+        // Reset current plan
         currentPlan = {
             name: '',
             date: '',
+            activeSession: '',
             masterTimer: 5,
-            prizes: [],
-            sessions: []
+            sessions: [],
+            prizes: []
         };
     }
     
-    // Delete selected plan
+    // Delete plan
     function deletePlan() {
-        const planKey = savedPlansSelect.value;
-        
-        if (!planKey) {
+        const planName = savedPlansSelect.value;
+        if (!planName) {
             alert('Please select a plan to delete');
             return;
         }
         
-        if (!confirm('Are you sure you want to delete this plan? This cannot be undone.')) {
+        if (!confirm(`Are you sure you want to delete the plan "${planName}"?`)) {
             return;
         }
         
-        try {
-            // Remove from plans list
-            const savedPlans = JSON.parse(localStorage.getItem('casinoDrawingPlans') || '[]');
-            const updatedPlans = savedPlans.filter(plan => plan.key !== planKey);
+        // Delete from localStorage
+        const savedPlans = JSON.parse(localStorage.getItem('casinoDrawingPlans') || '{}');
+        if (savedPlans[planName]) {
+            delete savedPlans[planName];
+            localStorage.setItem('casinoDrawingPlans', JSON.stringify(savedPlans));
             
-            localStorage.setItem('casinoDrawingPlans', JSON.stringify(updatedPlans));
-            localStorage.removeItem(planKey);
-            
+            // Update saved plans list
             loadSavedPlansList();
-            alert('Plan deleted successfully');
             
-        } catch (error) {
-            console.error('Error deleting plan:', error);
-            alert('An error occurred while deleting the plan.');
+            alert(`Plan "${planName}" deleted successfully`);
+        } else {
+            alert(`Plan "${planName}" not found`);
         }
     }
-    
-    // Event listeners
-    addSessionBtn.addEventListener('click', addSession);
-    addPrizeBtn.addEventListener('click', addPrize);
-    savePlanBtn.addEventListener('click', savePlan);
-    loadPlanBtn.addEventListener('click', loadPlan);
-    clearPlanBtn.addEventListener('click', clearPlan);
-    deletePlanBtn.addEventListener('click', deletePlan);
-    
-    // Initialize with one prize
-    addPrize();
 }); 
