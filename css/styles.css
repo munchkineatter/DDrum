@@ -993,4 +993,25 @@ footer {
     .plan-session-selector {
         grid-template-columns: 1fr;
     }
+}
+
+/* Session info in preview */
+.session-info {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    text-align: center;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.session-info h3 {
+    color: var(--primary-color);
+    margin-bottom: 5px;
+    font-size: 1.4rem;
+}
+
+.session-info p {
+    color: var(--secondary-text);
+    font-size: 1rem;
 } 

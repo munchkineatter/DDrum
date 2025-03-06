@@ -157,6 +157,52 @@ function loadPlanSessions(planName) {
         currentSessionId = selectedPlan.activeSession;
         document.getElementById('endSessionBtn').disabled = false;
         updateTimerFromSession();
+        
+        // Refresh any winner entry forms to update prize options
+        const entriesContainer = document.getElementById('entries-container');
+        const hasEntries = entriesContainer.querySelectorAll('.winner-entry').length > 0;
+        
+        if (hasEntries) {
+            // Save any data in the existing entries
+            const entryData = [];
+            entriesContainer.querySelectorAll('.winner-entry').forEach(entry => {
+                const nameInput = entry.querySelector('.winner-name');
+                const playerIdInput = entry.querySelector('.player-id');
+                
+                if (nameInput) {
+                    entryData.push({
+                        name: nameInput.value,
+                        playerId: playerIdInput ? playerIdInput.value : ''
+                    });
+                }
+            });
+            
+            // Clear and recreate entries
+            entriesContainer.innerHTML = '';
+            
+            if (entryData.length > 0) {
+                // Recreate entries with the saved data
+                entryData.forEach((data, index) => {
+                    createWinnerEntry(index === 0);
+                    const entries = entriesContainer.querySelectorAll('.winner-entry');
+                    const lastEntry = entries[entries.length - 1];
+                    
+                    if (lastEntry) {
+                        const nameInput = lastEntry.querySelector('.winner-name');
+                        const playerIdInput = lastEntry.querySelector('.player-id');
+                        
+                        if (nameInput) nameInput.value = data.name;
+                        if (playerIdInput) playerIdInput.value = data.playerId;
+                    }
+                });
+            } else {
+                // Create a default entry
+                createWinnerEntry(true);
+            }
+        }
+        
+        // Update preview with new session info
+        updatePreview();
     }
 }
 
@@ -259,15 +305,51 @@ function createWinnerEntry(isRequired = false) {
     entryDiv.className = 'winner-entry';
     entryDiv.id = entryId;
     
+    // Get prizes from current plan
+    let prizeOptions = '<option value="">Select a prize</option>';
+    
+    if (currentPlanName) {
+        const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
+        const selectedPlan = savedPlans.find(plan => plan.name === currentPlanName);
+        
+        if (selectedPlan && selectedPlan.prizes && selectedPlan.prizes.length > 0) {
+            selectedPlan.prizes.forEach(prize => {
+                const displayValue = prize.value ? ` ($${prize.value})` : '';
+                prizeOptions += `<option value="${prize.name}">${prize.name}${displayValue}</option>`;
+            });
+        }
+        
+        // Also check for session-specific prizes
+        if (currentSessionId && selectedPlan.sessions) {
+            const currentSession = selectedPlan.sessions.find(s => s.id === currentSessionId);
+            if (currentSession && currentSession.prizes && currentSession.prizes.length > 0) {
+                // Add session prizes that aren't already in the dropdown
+                currentSession.prizes.forEach(prizeText => {
+                    // Extract prize name from text which might contain value in parentheses
+                    const prizeName = prizeText.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                    if (!prizeOptions.includes(`value="${prizeName}"`)) {
+                        prizeOptions += `<option value="${prizeName}">${prizeText}</option>`;
+                    }
+                });
+            }
+        }
+    }
+    
     entryDiv.innerHTML = `
         <div>
             <div class="form-group">
                 <label for="${entryId}-name">Winner Name:</label>
-                <input type="text" id="${entryId}-name" class="winner-name" ${isRequired ? 'required' : ''} placeholder="Enter name (optional)">
+                <input type="text" id="${entryId}-name" class="winner-name" ${isRequired ? 'required' : ''} placeholder="Enter winner name">
             </div>
             <div class="form-group">
-                <label for="${entryId}-id">Unique ID:</label>
-                <input type="text" id="${entryId}-id" class="winner-id" required placeholder="Enter ID number">
+                <label for="${entryId}-id">Player ID:</label>
+                <input type="text" id="${entryId}-id" class="player-id" placeholder="Enter player ID (optional)">
+            </div>
+            <div class="form-group">
+                <label for="${entryId}-prize">Prize:</label>
+                <select id="${entryId}-prize" class="winner-prize">
+                    ${prizeOptions}
+                </select>
             </div>
         </div>
         ${!isRequired ? `<button type="button" class="remove-entry" onclick="removeEntry('${entryId}')">×</button>` : ''}
@@ -276,7 +358,7 @@ function createWinnerEntry(isRequired = false) {
     container.appendChild(entryDiv);
     
     // Update preview when entry fields change
-    entryDiv.querySelectorAll('input').forEach(input => {
+    entryDiv.querySelectorAll('input, select').forEach(input => {
         input.addEventListener('input', updatePreview);
     });
 }
@@ -311,94 +393,70 @@ function previewHeaderImage(input) {
 
 function updatePreview() {
     const previewContainer = document.getElementById('displayPreview');
-    if (!previewContainer) return;
-    
-    // Get header image
-    const headerImage = localStorage.getItem('casinoHeaderImage');
-    
-    // Get active winners (not claimed or disqualified)
-    const activeWinners = winners.filter(w => !w.claimed && !w.disqualified);
-    
-    // Check if there are existing winners or form entries
     const entries = document.querySelectorAll('.winner-entry');
-    const hasFormEntries = entries.length > 0;
     
-    // Preview content
-    let previewContent = '';
+    // Clear preview
+    previewContainer.innerHTML = '';
     
-    // Add header image if available
-    if (headerImage) {
-        previewContent += `<div class="header-image"><img src="${headerImage}" alt="Header"></div>`;
+    // If no entries, show placeholder
+    if (entries.length === 0) {
+        previewContainer.innerHTML = '<div class="placeholder">Waiting for winners to be added...</div>';
+        return;
     }
     
-    // Add winners from form input fields (preview mode)
-    if (hasFormEntries) {
-        let winnerCards = '';
-        let index = 1;
+    // Add session information if available
+    if (currentPlanName && currentSessionId) {
+        const sessionInfo = document.createElement('div');
+        sessionInfo.className = 'session-info';
         
-        entries.forEach(entry => {
-            const nameInput = entry.querySelector('.winner-name');
-            const idInput = entry.querySelector('.winner-id');
-            
-            if (idInput && idInput.value) {
-                const name = nameInput ? nameInput.value : 'Anonymous';
-                const id = idInput.value;
-                
-                winnerCards += `
-                    <div class="winner-card">
-                        <h2>Winner #${index}</h2>
-                        <p class="winner-name">${name || 'Anonymous'}</p>
-                        <p class="winner-id">${id}</p>
-                        <p class="winner-session">Session: Default</p>
-                    </div>
+        const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
+        const plan = savedPlans.find(p => p.name === currentPlanName);
+        
+        if (plan) {
+            const session = plan.sessions.find(s => s.id === currentSessionId);
+            if (session) {
+                sessionInfo.innerHTML = `
+                    <h3>${plan.name}</h3>
+                    <p>Session ${session.number} (${formatTimeForDisplay(session.startTime)} - ${formatTimeForDisplay(session.endTime)})</p>
                 `;
-                index++;
+                previewContainer.appendChild(sessionInfo);
             }
-        });
-        
-        // Add existing active winners
-        activeWinners.forEach(winner => {
-            winnerCards += `
-                <div class="winner-card">
-                    <h2>Winner #${index}</h2>
-                    <p class="winner-name">${winner.name || 'Anonymous'}</p>
-                    <p class="winner-id">${winner.uniqueId || 'N/A'}</p>
-                    <p class="winner-prize">${winner.prize || 'Prize'}</p>
-                    <p class="winner-session">Session: ${winner.session || 'Default'}</p>
-                </div>
-            `;
-            index++;
-        });
-        
-        if (winnerCards) {
-            previewContent += winnerCards;
-        } else {
-            previewContent += '<div class="placeholder">Waiting for winners to be added...</div>';
         }
-    } else if (activeWinners.length > 0) {
-        // If no form entries but we have active winners
-        let index = 1;
-        let winnerCards = '';
-        
-        activeWinners.forEach(winner => {
-            winnerCards += `
-                <div class="winner-card">
-                    <h2>Winner #${index}</h2>
-                    <p class="winner-name">${winner.name || 'Anonymous'}</p>
-                    <p class="winner-id">${winner.uniqueId || 'N/A'}</p>
-                    <p class="winner-prize">${winner.prize || 'Prize'}</p>
-                    <p class="winner-session">Session: ${winner.session || 'Default'}</p>
-                </div>
-            `;
-            index++;
-        });
-        
-        previewContent += winnerCards;
-    } else {
-        previewContent += '<div class="placeholder">Waiting for winners to be added...</div>';
     }
     
-    previewContainer.innerHTML = previewContent;
+    // Get header image if available
+    const headerImage = localStorage.getItem('casinoHeaderImage');
+    if (headerImage) {
+        const imgContainer = document.createElement('div');
+        imgContainer.className = 'header-image';
+        imgContainer.innerHTML = `<img src="${headerImage}" alt="Header Image">`;
+        previewContainer.appendChild(imgContainer);
+    }
+    
+    // Add winner cards
+    entries.forEach(entry => {
+        const nameInput = entry.querySelector('.winner-name');
+        const playerIdInput = entry.querySelector('.player-id');
+        const prizeSelect = entry.querySelector('.winner-prize');
+        
+        if (nameInput && (nameInput.value.trim() || (prizeSelect && prizeSelect.value))) {
+            const card = document.createElement('div');
+            card.className = 'winner-card';
+            
+            const name = nameInput.value.trim() || 'Winner';
+            const playerId = playerIdInput ? playerIdInput.value.trim() : '';
+            const prize = prizeSelect ? prizeSelect.options[prizeSelect.selectedIndex].text : '';
+            
+            card.innerHTML = `
+                <h2>${name}</h2>
+                ${playerId ? `<p class="player-id">ID: ${playerId}</p>` : ''}
+                ${prize ? `<p class="prize">Prize: ${prize}</p>` : ''}
+                <p class="drawing-time">Drawing Time: ${new Date().toLocaleTimeString()}</p>
+            `;
+            
+            previewContainer.appendChild(card);
+        }
+    });
 }
 
 function startTimer(seconds) {
