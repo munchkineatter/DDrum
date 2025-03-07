@@ -15,8 +15,15 @@ let db;
 let analytics;
 let firebaseInitialized = false;
 
+// Make variables globally accessible
+window.firebaseInitialized = false;
+window.firebaseInitError = null;
+window.firebaseLastInitAttempt = null;
+
 // Initialize Firebase when the document is ready
 document.addEventListener('DOMContentLoaded', function() {
+  console.log("DOMContentLoaded event triggered - will initialize Firebase");
+  window.firebaseLastInitAttempt = new Date().toISOString();
   initializeFirebase();
 });
 
@@ -24,29 +31,63 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeFirebase() {
   try {
     console.log("Attempting to initialize Firebase...");
+    
+    // Prevent multiple initializations
+    if (window.firebaseInitialized) {
+      console.log("Firebase already initialized, skipping initialization");
+      return;
+    }
+    
     app = firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     analytics = firebase.analytics();
+    
+    // Update both local and global variables
     firebaseInitialized = true;
+    window.firebaseInitialized = true;
+    
     console.log("✅ Firebase initialized successfully");
     
     // Make Firebase objects globally accessible for debugging
     window.firebase = firebase;
     window.db = db;
     window.firebaseApp = app;
-    window.firebaseInitialized = firebaseInitialized;
     
     // Test database connection
     testDatabaseConnection();
   } catch (error) {
     console.error("❌ Error initializing Firebase:", error);
+    
+    // Store error for debugging
+    window.firebaseInitError = error;
+    
     // Display a visible error on the page
     showFirebaseError("Failed to initialize Firebase: " + error.message);
     
-    // Make error accessible globally
-    window.firebaseInitError = error;
+    // Try to recover with a delayed retry (only once)
+    if (!window.firebaseRetryAttempted) {
+      window.firebaseRetryAttempted = true;
+      console.log("Will attempt to retry Firebase initialization in 3 seconds...");
+      
+      setTimeout(() => {
+        console.log("Retrying Firebase initialization...");
+        window.firebaseLastInitAttempt = new Date().toISOString();
+        initializeFirebase();
+      }, 3000);
+    }
   }
 }
+
+// Add a secondary initialization function that can be called manually if needed
+window.manualFirebaseInit = function() {
+  if (!window.firebaseInitialized) {
+    window.firebaseLastInitAttempt = new Date().toISOString();
+    initializeFirebase();
+    return "Firebase initialization attempted";
+  } else {
+    return "Firebase already initialized";
+  }
+};
 
 // Test connection to Firestore
 function testDatabaseConnection() {

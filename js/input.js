@@ -131,47 +131,127 @@ async function loadSavedPlans() {
         statusMessage.textContent = "Loading plans...";
         statusMessage.style.display = "block";
         
+        // First, check if Firebase is initialized
+        if (!window.firebaseInitialized) {
+            console.error("Firebase is not initialized when trying to load plans");
+            statusMessage.textContent = "ERROR: Firebase not initialized";
+            statusMessage.style.display = "block";
+            
+            // Add a debugging option
+            const debugOption = document.createElement('option');
+            debugOption.value = "_debug";
+            debugOption.textContent = "⚠️ Firebase connection error - click to debug";
+            planSelector.appendChild(debugOption);
+            return;
+        }
+        
+        console.log("Attempting to load plans from Firebase...");
+        
         // Get plans from Firebase
         const savedPlans = await firebasePlans.getAllPlans();
+        console.log("Plans retrieved from Firebase:", savedPlans);
         
         // Add plans to selector
         if (savedPlans && savedPlans.length > 0) {
             savedPlans.forEach(plan => {
                 const option = document.createElement('option');
                 option.value = plan.name;
-                option.textContent = `${plan.name} (${plan.date})`;
+                option.textContent = `${plan.name} (${plan.date || 'No date'})`;
                 planSelector.appendChild(option);
             });
             
             statusMessage.textContent = `${savedPlans.length} plans loaded`;
         } else {
-            statusMessage.textContent = "No plans found";
+            statusMessage.textContent = "No plans found in database";
+            console.log("No plans found in database or plans array is empty");
+            
+            // Add a test plan for debugging
+            const testOption = document.createElement('option');
+            testOption.value = "_test";
+            testOption.textContent = "⚠️ No plans found - click to create test plan";
+            planSelector.appendChild(testOption);
         }
+        
+        // Special handling for debug options
+        planSelector.addEventListener('change', async function(e) {
+            if (e.target.value === "_debug") {
+                // Show debugging info
+                alert("Firebase connection issue. Check console for details.");
+                console.log("Firebase initialization status:", window.firebaseInitialized);
+                e.target.value = ""; // Reset selection
+            }
+            else if (e.target.value === "_test") {
+                // Create a test plan
+                if (confirm("Would you like to create a test plan to verify Firebase connectivity?")) {
+                    try {
+                        const testPlan = {
+                            name: "Test Plan " + new Date().toLocaleTimeString(),
+                            date: new Date().toISOString().split('T')[0],
+                            masterTimer: 5,
+                            prizes: [{name: "Test Prize", value: "100"}],
+                            sessions: [{
+                                id: "session-" + Date.now(),
+                                number: 1,
+                                startTime: "10:00",
+                                endTime: "11:00",
+                                winners: 1,
+                                prizes: ["Test Prize ($100)"]
+                            }],
+                            activeSession: "session-" + Date.now(),
+                            lastModified: new Date().toISOString()
+                        };
+                        
+                        await firebasePlans.savePlan(testPlan);
+                        alert("Test plan created successfully. Reloading plans...");
+                        await loadSavedPlans(); // Reload plans
+                    } catch (error) {
+                        console.error("Error creating test plan:", error);
+                        alert("Error creating test plan: " + error.message);
+                    }
+                }
+                e.target.value = ""; // Reset selection
+            }
+        });
         
         setTimeout(() => {
             statusMessage.style.display = "none";
         }, 3000);
         
         // Check if we have an active plan
-        const activePlan = await firebasePlans.getActivePlan();
-        
-        if (activePlan) {
-            planSelector.value = activePlan.name;
-            loadPlanSessions(activePlan.name);
+        try {
+            const activePlan = await firebasePlans.getActivePlan();
+            
+            if (activePlan) {
+                console.log("Active plan found:", activePlan.name);
+                planSelector.value = activePlan.name;
+                loadPlanSessions(activePlan.name);
+            } else {
+                console.log("No active plan found");
+            }
+        } catch (activeError) {
+            console.error("Error loading active plan:", activeError);
         }
     } catch (error) {
         console.error("Error loading plans:", error);
-        statusMessage.textContent = "Error loading plans from database";
-        setTimeout(() => {
-            statusMessage.style.display = "none";
-        }, 3000);
+        statusMessage.textContent = "Error loading plans: " + error.message;
+        statusMessage.style.display = "block";
+        
+        // Add an error option
+        const errorOption = document.createElement('option');
+        errorOption.value = "_error";
+        errorOption.textContent = "⚠️ Error: " + error.message;
+        planSelector.appendChild(errorOption);
     }
 }
 
 // Load sessions for the selected plan
 async function loadPlanSessions(planName) {
-    if (!planName) return;
+    if (!planName) {
+        console.log("No plan name provided to loadPlanSessions");
+        return;
+    }
     
+    console.log(`Loading sessions for plan: ${planName}`);
     currentPlanName = planName;
     const sessionSelector = document.getElementById('sessionSelector');
     sessionSelector.disabled = false;
@@ -186,11 +266,29 @@ async function loadPlanSessions(planName) {
         statusMessage.style.display = "block";
         
         // Get the plan from Firebase
+        console.log(`Retrieving plan details for: ${planName}`);
         const selectedPlan = await firebasePlans.getPlan(planName);
+        console.log("Plan details retrieved:", selectedPlan);
         
-        if (!selectedPlan || !selectedPlan.sessions) {
-            alert('No sessions found for this plan');
-            statusMessage.textContent = "No sessions found for this plan";
+        if (!selectedPlan) {
+            statusMessage.textContent = "Error: Plan not found";
+            sessionSelector.disabled = true;
+            setTimeout(() => {
+                statusMessage.style.display = "none";
+            }, 3000);
+            return;
+        }
+        
+        if (!selectedPlan.sessions || selectedPlan.sessions.length === 0) {
+            statusMessage.textContent = "This plan has no sessions defined";
+            sessionSelector.disabled = true;
+            
+            // Add a debug option
+            const noSessionsOption = document.createElement('option');
+            noSessionsOption.value = "_nosessions";
+            noSessionsOption.textContent = "No sessions available";
+            sessionSelector.appendChild(noSessionsOption);
+            
             setTimeout(() => {
                 statusMessage.style.display = "none";
             }, 3000);
@@ -198,77 +296,110 @@ async function loadPlanSessions(planName) {
         }
         
         // Add sessions to selector
-        selectedPlan.sessions.forEach(session => {
+        selectedPlan.sessions.forEach((session, index) => {
+            if (!session.id || !session.startTime || !session.endTime) {
+                console.warn(`Session ${index} has missing data:`, session);
+                return; // Skip invalid sessions
+            }
+            
             const option = document.createElement('option');
             option.value = session.id;
-            option.textContent = `Session ${session.number} (${formatTimeForDisplay(session.startTime)} - ${formatTimeForDisplay(session.endTime)})`;
+            
+            // Handle potential missing data
+            const sessionNumber = session.number || (index + 1);
+            const startTime = session.startTime || "??:??";
+            const endTime = session.endTime || "??:??";
+            
+            option.textContent = `Session ${sessionNumber} (${formatTimeForDisplay(startTime)} - ${formatTimeForDisplay(endTime)})`;
             sessionSelector.appendChild(option);
         });
         
-        statusMessage.textContent = `${selectedPlan.sessions.length} sessions loaded`;
+        const validSessionCount = sessionSelector.options.length - 1; // Subtract placeholder
+        statusMessage.textContent = `${validSessionCount} sessions loaded`;
+        
+        if (validSessionCount === 0) {
+            statusMessage.textContent = "Warning: No valid sessions found";
+            sessionSelector.disabled = true;
+        }
+        
         setTimeout(() => {
             statusMessage.style.display = "none";
         }, 3000);
         
         // If there's an active session in this plan, select it
         if (selectedPlan.activeSession) {
-            sessionSelector.value = selectedPlan.activeSession;
-            currentSessionId = selectedPlan.activeSession;
-            document.getElementById('endSessionBtn').disabled = false;
-            updateTimerFromSession();
+            const sessionExists = Array.from(sessionSelector.options).some(
+                option => option.value === selectedPlan.activeSession
+            );
             
-            // Refresh any winner entry forms to update prize options
-            const entriesContainer = document.getElementById('entries-container');
-            const hasEntries = entriesContainer.querySelectorAll('.winner-entry').length > 0;
-            
-            if (hasEntries) {
-                // Save any data in the existing entries
-                const entryData = [];
-                entriesContainer.querySelectorAll('.winner-entry').forEach(entry => {
-                    const nameInput = entry.querySelector('.winner-name');
-                    const playerIdInput = entry.querySelector('.player-id');
-                    
-                    if (nameInput) {
-                        entryData.push({
-                            name: nameInput.value,
-                            playerId: playerIdInput ? playerIdInput.value : ''
-                        });
-                    }
-                });
+            if (sessionExists) {
+                console.log(`Selecting active session: ${selectedPlan.activeSession}`);
+                sessionSelector.value = selectedPlan.activeSession;
+                currentSessionId = selectedPlan.activeSession;
+                document.getElementById('endSessionBtn').disabled = false;
+                updateTimerFromSession();
                 
-                // Clear and recreate entries
-                entriesContainer.innerHTML = '';
+                // Refresh any winner entry forms to update prize options
+                refreshWinnerEntryForms();
                 
-                if (entryData.length > 0) {
-                    // Recreate entries with the saved data
-                    entryData.forEach((data, index) => {
-                        createWinnerEntry(index === 0);
-                        const entries = entriesContainer.querySelectorAll('.winner-entry');
-                        const lastEntry = entries[entries.length - 1];
-                        
-                        if (lastEntry) {
-                            const nameInput = lastEntry.querySelector('.winner-name');
-                            const playerIdInput = lastEntry.querySelector('.player-id');
-                            
-                            if (nameInput) nameInput.value = data.name;
-                            if (playerIdInput) playerIdInput.value = data.playerId;
-                        }
-                    });
-                } else {
-                    // Create a default entry
-                    createWinnerEntry(true);
-                }
+                // Update preview with new session info
+                updatePreview();
+            } else {
+                console.warn(`Active session ${selectedPlan.activeSession} not found in options`);
             }
-            
-            // Update preview with new session info
-            updatePreview();
+        } else {
+            console.log("No active session found in the plan");
         }
     } catch (error) {
         console.error("Error loading sessions:", error);
-        statusMessage.textContent = "Error loading sessions from database";
-        setTimeout(() => {
-            statusMessage.style.display = "none";
-        }, 3000);
+        statusMessage.textContent = "Error loading sessions: " + error.message;
+        statusMessage.style.display = "block";
+        sessionSelector.disabled = true;
+    }
+}
+
+// Helper function to refresh winner entry forms
+function refreshWinnerEntryForms() {
+    const entriesContainer = document.getElementById('entries-container');
+    const hasEntries = entriesContainer.querySelectorAll('.winner-entry').length > 0;
+    
+    if (hasEntries) {
+        // Save any data in the existing entries
+        const entryData = [];
+        entriesContainer.querySelectorAll('.winner-entry').forEach(entry => {
+            const nameInput = entry.querySelector('.winner-name');
+            const playerIdInput = entry.querySelector('.player-id');
+            
+            if (nameInput) {
+                entryData.push({
+                    name: nameInput.value,
+                    playerId: playerIdInput ? playerIdInput.value : ''
+                });
+            }
+        });
+        
+        // Clear and recreate entries
+        entriesContainer.innerHTML = '';
+        
+        if (entryData.length > 0) {
+            // Recreate entries with the saved data
+            entryData.forEach((data, index) => {
+                createWinnerEntry(index === 0);
+                const entries = entriesContainer.querySelectorAll('.winner-entry');
+                const lastEntry = entries[entries.length - 1];
+                
+                if (lastEntry) {
+                    const nameInput = lastEntry.querySelector('.winner-name');
+                    const playerIdInput = lastEntry.querySelector('.player-id');
+                    
+                    if (nameInput) nameInput.value = data.name;
+                    if (playerIdInput) playerIdInput.value = data.playerId;
+                }
+            });
+        } else {
+            // Create a default entry
+            createWinnerEntry(true);
+        }
     }
 }
 
@@ -414,7 +545,9 @@ async function endCurrentSession() {
     }
 }
 
+// Create a new winner entry form
 function createWinnerEntry(isRequired = false) {
+    console.log("Creating new winner entry form");
     const container = document.getElementById('entries-container');
     const entryId = 'entry-' + Date.now();
     
@@ -426,32 +559,76 @@ function createWinnerEntry(isRequired = false) {
     let prizeOptions = '<option value="">Select a prize</option>';
     
     if (currentPlanName) {
-        const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
-        const selectedPlan = savedPlans.find(plan => plan.name === currentPlanName);
-        
-        if (selectedPlan && selectedPlan.prizes && selectedPlan.prizes.length > 0) {
-            selectedPlan.prizes.forEach(prize => {
-                const displayValue = prize.value ? ` ($${prize.value})` : '';
-                prizeOptions += `<option value="${prize.name}">${prize.name}${displayValue}</option>`;
-            });
-        }
-        
-        // Also check for session-specific prizes
-        if (currentSessionId && selectedPlan.sessions) {
-            const currentSession = selectedPlan.sessions.find(s => s.id === currentSessionId);
-            if (currentSession && currentSession.prizes && currentSession.prizes.length > 0) {
-                // Add session prizes that aren't already in the dropdown
-                currentSession.prizes.forEach(prizeText => {
-                    // Extract prize name from text which might contain value in parentheses
-                    const prizeName = prizeText.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                    if (!prizeOptions.includes(`value="${prizeName}"`)) {
-                        prizeOptions += `<option value="${prizeName}">${prizeText}</option>`;
+        console.log(`Loading prizes for plan: ${currentPlanName}`);
+        // Try to get plan from Firebase directly
+        firebasePlans.getPlan(currentPlanName)
+            .then(selectedPlan => {
+                if (selectedPlan && selectedPlan.prizes && selectedPlan.prizes.length > 0) {
+                    console.log(`Found ${selectedPlan.prizes.length} prizes in plan`);
+                    
+                    // Get the select element
+                    const prizeSelect = document.getElementById(`${entryId}-prize`);
+                    if (prizeSelect) {
+                        // Clear existing options
+                        prizeSelect.innerHTML = '<option value="">Select a prize</option>';
+                        
+                        // Add plan prizes
+                        selectedPlan.prizes.forEach(prize => {
+                            const displayValue = prize.value ? ` ($${prize.value})` : '';
+                            const option = document.createElement('option');
+                            option.value = prize.name;
+                            option.textContent = `${prize.name}${displayValue}`;
+                            prizeSelect.appendChild(option);
+                        });
+                        
+                        // Add session-specific prizes
+                        if (currentSessionId && selectedPlan.sessions) {
+                            const currentSession = selectedPlan.sessions.find(s => s.id === currentSessionId);
+                            if (currentSession && currentSession.prizes && currentSession.prizes.length > 0) {
+                                console.log(`Found ${currentSession.prizes.length} prizes in session`);
+                                
+                                // Add a separator
+                                const separator = document.createElement('option');
+                                separator.disabled = true;
+                                separator.textContent = '──────────────';
+                                prizeSelect.appendChild(separator);
+                                
+                                // Add session prizes that aren't already in the dropdown
+                                currentSession.prizes.forEach(prizeText => {
+                                    // Extract prize name from text which might contain value in parentheses
+                                    const prizeName = prizeText.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                                    
+                                    // Check if this prize is already in the dropdown
+                                    let alreadyExists = false;
+                                    for (let i = 0; i < prizeSelect.options.length; i++) {
+                                        if (prizeSelect.options[i].value === prizeName) {
+                                            alreadyExists = true;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (!alreadyExists) {
+                                        const option = document.createElement('option');
+                                        option.value = prizeName;
+                                        option.textContent = prizeText;
+                                        prizeSelect.appendChild(option);
+                                    }
+                                });
+                            }
+                        }
+                    } else {
+                        console.warn(`Prize select element not found: ${entryId}-prize`);
                     }
-                });
-            }
-        }
+                } else {
+                    console.log("No prizes found in plan");
+                }
+            })
+            .catch(error => {
+                console.error("Error loading prizes:", error);
+            });
     }
     
+    // Create the HTML immediately so we can append it to the DOM
     entryDiv.innerHTML = `
         <div>
             <div class="form-group">
