@@ -48,8 +48,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create the first winner entry
     createWinnerEntry(true);
     
-    // Load available plans
-    loadSavedPlans();
+    // Load available plans with fallback to direct loading
+    loadSavedPlans().catch(error => {
+        console.error("Error in normal plan loading:", error);
+        console.log("Attempting direct plan loading as fallback...");
+        
+        // Try direct loading as fallback
+        if (typeof window.directLoadPlans === 'function') {
+            window.directLoadPlans().catch(directError => {
+                console.error("Direct plan loading also failed:", directError);
+            });
+        }
+    });
     
     // Setup event listeners
     document.getElementById('addEntry').addEventListener('click', function() {
@@ -1159,4 +1169,76 @@ function updateWinnerDisplay() {
         `;
         displayContainer.appendChild(winnerCard);
     });
-} 
+}
+
+// Direct plan loading function that bypasses the normal flow
+window.directLoadPlans = async function() {
+    console.log("Attempting direct plan loading...");
+    
+    try {
+        // Ensure Firebase is initialized
+        if (!window.firebaseInitialized) {
+            console.log("Firebase not initialized, attempting manual initialization");
+            if (typeof window.manualFirebaseInit === 'function') {
+                window.manualFirebaseInit();
+            } else {
+                throw new Error("Firebase not initialized and manual init not available");
+            }
+        }
+        
+        // Get direct access to Firestore
+        const directDb = window.db || firebase.firestore();
+        
+        // Get the plan selector
+        const planSelector = document.getElementById('planSelector');
+        if (!planSelector) {
+            throw new Error("Plan selector not found in DOM");
+        }
+        
+        // Clear existing options except the placeholder
+        while (planSelector.options.length > 1) {
+            planSelector.remove(1);
+        }
+        
+        console.log("Directly querying plans collection...");
+        
+        // Query plans directly
+        const snapshot = await directDb.collection("plans").get();
+        
+        if (snapshot.empty) {
+            console.log("No plans found in direct query");
+            return false;
+        }
+        
+        console.log(`Found ${snapshot.size} plans in direct query`);
+        
+        // Add plans to selector
+        snapshot.forEach(doc => {
+            const plan = doc.data();
+            const option = document.createElement('option');
+            option.value = plan.name;
+            option.textContent = `${plan.name} (${plan.date || 'No date'})`;
+            planSelector.appendChild(option);
+        });
+        
+        // Check if we have an active plan
+        const activePlanDoc = await directDb.collection("config").doc("activePlan").get();
+        
+        if (activePlanDoc.exists) {
+            const activePlanData = activePlanDoc.data();
+            if (activePlanData && activePlanData.planName) {
+                console.log(`Setting active plan to ${activePlanData.planName}`);
+                planSelector.value = activePlanData.planName;
+                
+                // Trigger change event
+                const event = new Event('change');
+                planSelector.dispatchEvent(event);
+            }
+        }
+        
+        return true;
+    } catch (error) {
+        console.error("Error in directLoadPlans:", error);
+        return false;
+    }
+}; 

@@ -31,6 +31,7 @@
                     <select id="planSelector">
                         <option value="">Select a plan</option>
                     </select>
+                    <button type="button" id="diagnosePlanLoading" class="secondary-btn" style="margin-top: 5px; width: 100%;">Diagnose Plan Loading</button>
                 </div>
                 <div class="form-group">
                     <label for="sessionSelector">Current Session</label>
@@ -114,5 +115,255 @@
     </div>
     
     <script src="js/input.js"></script>
+    
+    <!-- Direct diagnostic script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listener for the diagnose button
+            const diagnoseBtn = document.getElementById('diagnosePlanLoading');
+            if (diagnoseBtn) {
+                diagnoseBtn.addEventListener('click', runDiagnostics);
+            }
+            
+            // Run diagnostics function
+            function runDiagnostics() {
+                console.clear();
+                console.log("========== PLAN LOADING DIAGNOSTICS ==========");
+                
+                // Create diagnostic output element
+                let diagOutput = document.getElementById('diagnostic-output');
+                if (!diagOutput) {
+                    diagOutput = document.createElement('div');
+                    diagOutput.id = 'diagnostic-output';
+                    diagOutput.style.position = 'fixed';
+                    diagOutput.style.top = '50%';
+                    diagOutput.style.left = '50%';
+                    diagOutput.style.transform = 'translate(-50%, -50%)';
+                    diagOutput.style.width = '80%';
+                    diagOutput.style.maxWidth = '600px';
+                    diagOutput.style.maxHeight = '80vh';
+                    diagOutput.style.overflowY = 'auto';
+                    diagOutput.style.backgroundColor = '#222';
+                    diagOutput.style.color = '#fff';
+                    diagOutput.style.padding = '20px';
+                    diagOutput.style.borderRadius = '8px';
+                    diagOutput.style.zIndex = '9999';
+                    diagOutput.style.boxShadow = '0 0 20px rgba(0,0,0,0.5)';
+                    document.body.appendChild(diagOutput);
+                }
+                
+                diagOutput.innerHTML = '<h2>Plan Loading Diagnostics</h2><div id="diag-content"></div><button id="close-diag" style="margin-top:15px;padding:8px 15px;background:#444;border:none;color:white;border-radius:4px;cursor:pointer;">Close</button>';
+                
+                const diagContent = document.getElementById('diag-content');
+                document.getElementById('close-diag').addEventListener('click', function() {
+                    document.body.removeChild(diagOutput);
+                });
+                
+                // Helper function to add diagnostic info
+                function addDiagInfo(text, isError = false) {
+                    const p = document.createElement('p');
+                    p.textContent = text;
+                    p.style.margin = '5px 0';
+                    p.style.fontFamily = 'monospace';
+                    p.style.fontSize = '14px';
+                    if (isError) {
+                        p.style.color = '#ff6666';
+                    }
+                    diagContent.appendChild(p);
+                    console.log(isError ? "❌ " + text : "✓ " + text);
+                }
+                
+                // Check Firebase initialization
+                addDiagInfo("Checking Firebase initialization...");
+                if (typeof firebase === 'undefined') {
+                    addDiagInfo("Firebase is not defined! SDK might not be loaded.", true);
+                } else {
+                    addDiagInfo("Firebase SDK is loaded.");
+                    
+                    if (window.firebaseInitialized) {
+                        addDiagInfo("Firebase is initialized.");
+                    } else {
+                        addDiagInfo("Firebase is NOT initialized!", true);
+                        
+                        // Try to initialize manually
+                        addDiagInfo("Attempting manual initialization...");
+                        try {
+                            if (typeof window.manualFirebaseInit === 'function') {
+                                const result = window.manualFirebaseInit();
+                                addDiagInfo("Manual init result: " + result);
+                            } else {
+                                addDiagInfo("Manual init function not available", true);
+                            }
+                        } catch (e) {
+                            addDiagInfo("Error during manual init: " + e.message, true);
+                        }
+                    }
+                }
+                
+                // Direct Firestore check
+                addDiagInfo("Checking Firestore access...");
+                if (typeof firebase !== 'undefined' && firebase.firestore) {
+                    try {
+                        const db = firebase.firestore();
+                        addDiagInfo("Firestore is available.");
+                        
+                        // Try to directly read from the plans collection
+                        addDiagInfo("Attempting to directly read plans collection...");
+                        db.collection("plans").get()
+                            .then(snapshot => {
+                                if (snapshot.empty) {
+                                    addDiagInfo("No plans found in database!", true);
+                                } else {
+                                    addDiagInfo(`Found ${snapshot.size} plans in database.`);
+                                    
+                                    // List the plans
+                                    const plansList = document.createElement('ul');
+                                    plansList.style.marginTop = '10px';
+                                    plansList.style.marginBottom = '10px';
+                                    plansList.style.paddingLeft = '20px';
+                                    
+                                    snapshot.forEach(doc => {
+                                        const plan = doc.data();
+                                        const li = document.createElement('li');
+                                        li.textContent = `${plan.name} (${plan.date || 'No date'})`;
+                                        li.style.margin = '5px 0';
+                                        
+                                        // Add a "Load This Plan" button
+                                        const loadBtn = document.createElement('button');
+                                        loadBtn.textContent = 'Load This Plan';
+                                        loadBtn.style.marginLeft = '10px';
+                                        loadBtn.style.padding = '3px 8px';
+                                        loadBtn.style.backgroundColor = '#007bff';
+                                        loadBtn.style.border = 'none';
+                                        loadBtn.style.borderRadius = '3px';
+                                        loadBtn.style.color = 'white';
+                                        loadBtn.style.cursor = 'pointer';
+                                        
+                                        loadBtn.addEventListener('click', function() {
+                                            // Directly set the plan in the selector
+                                            const planSelector = document.getElementById('planSelector');
+                                            
+                                            // First check if this plan is in the dropdown
+                                            let found = false;
+                                            for (let i = 0; i < planSelector.options.length; i++) {
+                                                if (planSelector.options[i].value === plan.name) {
+                                                    planSelector.selectedIndex = i;
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            // If not found, add it
+                                            if (!found) {
+                                                const option = document.createElement('option');
+                                                option.value = plan.name;
+                                                option.textContent = `${plan.name} (${plan.date || 'No date'})`;
+                                                planSelector.appendChild(option);
+                                                planSelector.value = plan.name;
+                                            }
+                                            
+                                            // Trigger the change event
+                                            const event = new Event('change');
+                                            planSelector.dispatchEvent(event);
+                                            
+                                            // Close the diagnostic
+                                            document.body.removeChild(diagOutput);
+                                        });
+                                        
+                                        li.appendChild(loadBtn);
+                                        plansList.appendChild(li);
+                                    });
+                                    
+                                    diagContent.appendChild(plansList);
+                                }
+                            })
+                            .catch(error => {
+                                addDiagInfo("Error reading plans: " + error.message, true);
+                            });
+                    } catch (e) {
+                        addDiagInfo("Error accessing Firestore: " + e.message, true);
+                    }
+                } else {
+                    addDiagInfo("Firestore is not available!", true);
+                }
+                
+                // Check if loadSavedPlans function exists
+                addDiagInfo("Checking if loadSavedPlans function exists...");
+                if (typeof loadSavedPlans === 'function') {
+                    addDiagInfo("loadSavedPlans function exists.");
+                    
+                    // Add a button to manually call loadSavedPlans
+                    const reloadBtn = document.createElement('button');
+                    reloadBtn.textContent = 'Manually Reload Plans';
+                    reloadBtn.style.display = 'block';
+                    reloadBtn.style.margin = '15px auto';
+                    reloadBtn.style.padding = '8px 15px';
+                    reloadBtn.style.backgroundColor = '#28a745';
+                    reloadBtn.style.border = 'none';
+                    reloadBtn.style.borderRadius = '4px';
+                    reloadBtn.style.color = 'white';
+                    reloadBtn.style.cursor = 'pointer';
+                    
+                    reloadBtn.addEventListener('click', function() {
+                        addDiagInfo("Manually calling loadSavedPlans()...");
+                        try {
+                            loadSavedPlans().then(() => {
+                                addDiagInfo("loadSavedPlans completed.");
+                            }).catch(e => {
+                                addDiagInfo("Error in loadSavedPlans: " + e.message, true);
+                            });
+                        } catch (e) {
+                            addDiagInfo("Error calling loadSavedPlans: " + e.message, true);
+                        }
+                    });
+                    
+                    diagContent.appendChild(reloadBtn);
+                    
+                    // Add a button for direct plan loading
+                    if (typeof window.directLoadPlans === 'function') {
+                        const directLoadBtn = document.createElement('button');
+                        directLoadBtn.textContent = 'Direct Load Plans (Bypass Normal Flow)';
+                        directLoadBtn.style.display = 'block';
+                        directLoadBtn.style.margin = '15px auto';
+                        directLoadBtn.style.padding = '8px 15px';
+                        directLoadBtn.style.backgroundColor = '#dc3545';
+                        directLoadBtn.style.border = 'none';
+                        directLoadBtn.style.borderRadius = '4px';
+                        directLoadBtn.style.color = 'white';
+                        directLoadBtn.style.cursor = 'pointer';
+                        
+                        directLoadBtn.addEventListener('click', function() {
+                            addDiagInfo("Attempting direct plan loading...");
+                            window.directLoadPlans()
+                                .then(result => {
+                                    if (result) {
+                                        addDiagInfo("Direct plan loading successful!");
+                                    } else {
+                                        addDiagInfo("Direct plan loading completed but no plans found.", true);
+                                    }
+                                })
+                                .catch(e => {
+                                    addDiagInfo("Error in direct plan loading: " + e.message, true);
+                                });
+                        });
+                        
+                        diagContent.appendChild(directLoadBtn);
+                    }
+                } else {
+                    addDiagInfo("loadSavedPlans function does NOT exist!", true);
+                }
+            }
+            
+            // Run diagnostics after a short delay to ensure everything is loaded
+            setTimeout(function() {
+                // Check if plans loaded automatically
+                const planSelector = document.getElementById('planSelector');
+                if (planSelector && planSelector.options.length <= 1) {
+                    console.log("No plans loaded automatically, running initial diagnostics...");
+                    runDiagnostics();
+                }
+            }, 3000);
+        });
+    </script>
 </body>
 </html> 

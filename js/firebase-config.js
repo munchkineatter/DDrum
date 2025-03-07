@@ -20,11 +20,57 @@ window.firebaseInitialized = false;
 window.firebaseInitError = null;
 window.firebaseLastInitAttempt = null;
 
-// Initialize Firebase when the document is ready
+// Direct initialization function that can be called immediately
+(function directFirebaseInit() {
+  console.log("Attempting direct Firebase initialization...");
+  try {
+    // Check if Firebase is already initialized
+    if (window.firebaseInitialized) {
+      console.log("Firebase already initialized, skipping direct initialization");
+      return;
+    }
+    
+    // Initialize Firebase
+    app = firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    
+    // Update flags
+    firebaseInitialized = true;
+    window.firebaseInitialized = true;
+    
+    // Make Firebase objects globally accessible
+    window.firebase = firebase;
+    window.db = db;
+    window.firebaseApp = app;
+    
+    console.log("✅ Firebase directly initialized successfully");
+    
+    // Test database connection
+    db.collection("_connection_test").doc("direct_init").set({
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      method: "direct_init"
+    }).then(() => {
+      console.log("✅ Direct initialization database test successful");
+    }).catch(error => {
+      console.error("❌ Direct initialization database test failed:", error);
+    });
+  } catch (error) {
+    console.error("❌ Error during direct Firebase initialization:", error);
+    window.firebaseInitError = error;
+  }
+})();
+
+// Initialize Firebase when the document is ready (backup method)
 document.addEventListener('DOMContentLoaded', function() {
   console.log("DOMContentLoaded event triggered - will initialize Firebase");
   window.firebaseLastInitAttempt = new Date().toISOString();
-  initializeFirebase();
+  
+  // Only initialize if not already initialized by direct method
+  if (!window.firebaseInitialized) {
+    initializeFirebase();
+  } else {
+    console.log("Firebase already initialized by direct method, skipping DOMContentLoaded initialization");
+  }
 });
 
 // Initialize Firebase
