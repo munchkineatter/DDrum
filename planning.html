@@ -24,10 +24,22 @@
         </header>
         
         <main>
+            <!-- Database Diagnostic Tool (can be toggled) -->
+            <div class="diagnostic-toggle">
+                <button id="toggle-diagnostic" class="secondary-btn">Show Firebase Diagnostic</button>
+            </div>
+            <div id="database-diagnostic" class="diagnostic-panel" style="display: none;">
+                <h3>Firebase Database Diagnostic</h3>
+                <div id="connection-status">Checking connection...</div>
+                <button id="test-connection" class="primary-btn">Test Connection</button>
+                <button id="toggle-console" class="secondary-btn">Show Console</button>
+                <div id="console-output" class="console-output" style="display: none;"></div>
+            </div>
+            
             <div class="planning-container">
                 <!-- Top row: Promotion details and bulk session creation -->
                 <div class="planning-grid">
-                    <!-- Left column: Promotion info and prizes -->
+                    <!-- Left column: Promotion info -->
                     <div class="grid-item promotion-details">
                         <h2>1. Promotion Details</h2>
                         <div class="form-group">
@@ -44,25 +56,9 @@
                         </div>
                     </div>
 
-                    <!-- Right column: Prize management -->
-                    <div class="grid-item prize-management-container">
-                        <h2>2. Prize Management</h2>
-                        <div class="prize-management">
-                            <div id="prize-list">
-                                <div class="prize-item">
-                                    <input type="text" placeholder="Prize name" class="prize-name">
-                                    <input type="text" placeholder="Value" class="prize-value">
-                                    <button type="button" class="remove-prize">×</button>
-                                    <button type="button" class="repeat-prize-button">Apply to all sessions</button>
-                                </div>
-                            </div>
-                            <button type="button" id="add-prize" class="secondary-btn">+ Add Prize</button>
-                        </div>
-                    </div>
-
-                    <!-- Bottom left: Bulk session creator -->
+                    <!-- Right column: Bulk session creation -->
                     <div class="grid-item bulk-session-container">
-                        <h2>3. Bulk Session Creation</h2>
+                        <h2>2. Bulk Session Creation</h2>
                         <div class="bulk-session-creator">
                             <div class="bulk-options">
                                 <div class="form-group">
@@ -92,13 +88,33 @@
                         </div>
                     </div>
 
-                    <!-- Bottom right: Sessions -->
+                    <!-- Drawing Sessions -->
                     <div class="grid-item sessions-container">
-                        <h2>4. Drawing Sessions</h2>
+                        <h2>3. Drawing Sessions</h2>
                         <div id="sessions-grid">
                             <!-- Sessions will be added here in a grid -->
                         </div>
                         <button type="button" id="add-session" class="primary-btn">+ Add Drawing Session</button>
+                    </div>
+                    
+                    <!-- Prize Management -->
+                    <div class="grid-item prize-management-container">
+                        <h2>4. Prize Management</h2>
+                        <div class="prize-management">
+                            <div class="prize-templates-controls">
+                                <button type="button" id="load-prize-template" class="secondary-btn">Load Template</button>
+                                <button type="button" id="save-prize-template" class="secondary-btn">Save as Template</button>
+                            </div>
+                            <div id="prize-list">
+                                <div class="prize-item">
+                                    <input type="text" placeholder="Prize name" class="prize-name">
+                                    <input type="text" placeholder="Value" class="prize-value">
+                                    <button type="button" class="remove-prize">×</button>
+                                    <button type="button" class="repeat-prize-button">Apply to all sessions</button>
+                                </div>
+                            </div>
+                            <button type="button" id="add-prize" class="secondary-btn">+ Add Prize</button>
+                        </div>
                     </div>
 
                     <!-- Full width: Timeline -->
@@ -167,6 +183,145 @@
         </div>
     </template>
     
+    <!-- Prize Template Modal -->
+    <div id="prize-template-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Prize Templates</h3>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="prize-templates-container">
+                    <!-- Prize templates will be loaded here -->
+                    <div class="placeholder">No prize templates found</div>
+                </div>
+                <div class="template-save-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="template-name">Template Name</label>
+                        <input type="text" id="template-name" placeholder="Enter template name">
+                    </div>
+                    <button type="button" id="save-template-btn" class="primary-btn">Save Template</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <script src="js/planning.js"></script>
+    <script>
+        // Add diagnostic functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleDiagnosticBtn = document.getElementById('toggle-diagnostic');
+            const diagnosticPanel = document.getElementById('database-diagnostic');
+            const connectionStatus = document.getElementById('connection-status');
+            const testConnectionBtn = document.getElementById('test-connection');
+            const toggleConsoleBtn = document.getElementById('toggle-console');
+            const consoleOutput = document.getElementById('console-output');
+            
+            // Toggle diagnostic panel
+            toggleDiagnosticBtn.addEventListener('click', function() {
+                if (diagnosticPanel.style.display === 'none') {
+                    diagnosticPanel.style.display = 'block';
+                    toggleDiagnosticBtn.textContent = 'Hide Firebase Diagnostic';
+                } else {
+                    diagnosticPanel.style.display = 'none';
+                    toggleDiagnosticBtn.textContent = 'Show Firebase Diagnostic';
+                }
+            });
+            
+            // Override console.log to capture output
+            const originalLog = console.log;
+            const originalError = console.error;
+            
+            function addToConsole(message, isError = false) {
+                const entry = document.createElement('div');
+                entry.textContent = message;
+                if (isError) entry.style.color = 'red';
+                consoleOutput.appendChild(entry);
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+            
+            console.log = function(message) {
+                originalLog.apply(console, arguments);
+                addToConsole(typeof message === 'object' ? JSON.stringify(message) : message);
+            };
+            
+            console.error = function(message) {
+                originalError.apply(console, arguments);
+                addToConsole(typeof message === 'object' ? JSON.stringify(message) : message, true);
+            };
+            
+            // Test connection button
+            testConnectionBtn.addEventListener('click', function() {
+                connectionStatus.textContent = 'Testing connection...';
+                connectionStatus.style.color = 'orange';
+                
+                // Clear console
+                consoleOutput.innerHTML = '';
+                
+                // Test database connection
+                try {
+                    if (!window.firebaseInitialized) {
+                        connectionStatus.textContent = 'Error: Firebase not initialized';
+                        connectionStatus.style.color = 'red';
+                        return;
+                    }
+                    
+                    const testDoc = window.db.collection('_connection_test').doc('test');
+                    testDoc.set({ 
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        browser: navigator.userAgent,
+                        testTime: new Date().toISOString()
+                    })
+                    .then(() => {
+                        connectionStatus.textContent = 'Connection successful!';
+                        connectionStatus.style.color = 'green';
+                        console.log('✅ Database write test successful');
+                        
+                        // Now try reading
+                        return testDoc.get();
+                    })
+                    .then(doc => {
+                        if (doc.exists) {
+                            console.log('✅ Database read test successful');
+                            console.log('Retrieved data:', doc.data());
+                        } else {
+                            console.error('❌ Document does not exist after writing');
+                            connectionStatus.textContent = 'Error: Document not found after writing';
+                            connectionStatus.style.color = 'red';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Connection test failed:', error);
+                        connectionStatus.textContent = 'Connection failed: ' + error.message;
+                        connectionStatus.style.color = 'red';
+                    });
+                } catch (error) {
+                    console.error('❌ Error during test:', error);
+                    connectionStatus.textContent = 'Error: ' + error.message;
+                    connectionStatus.style.color = 'red';
+                }
+            });
+            
+            // Toggle console button
+            toggleConsoleBtn.addEventListener('click', function() {
+                if (consoleOutput.style.display === 'none') {
+                    consoleOutput.style.display = 'block';
+                    toggleConsoleBtn.textContent = 'Hide Console';
+                } else {
+                    consoleOutput.style.display = 'none';
+                    toggleConsoleBtn.textContent = 'Show Console';
+                }
+            });
+            
+            // Initial check
+            if (window.firebaseInitialized) {
+                connectionStatus.textContent = 'Firebase initialized';
+                connectionStatus.style.color = 'blue';
+            } else {
+                connectionStatus.textContent = 'Firebase not initialized';
+                connectionStatus.style.color = 'red';
+            }
+        });
+    </script>
 </body>
 </html> 

@@ -24,15 +24,6 @@
         </header>
         
         <main>
-            <!-- Database Diagnostic Tool (temporary) -->
-            <div id="database-diagnostic" class="diagnostic-panel">
-                <h3>Firebase Database Diagnostic</h3>
-                <div id="connection-status">Checking connection...</div>
-                <button id="test-connection" class="primary-btn">Test Connection</button>
-                <button id="toggle-console" class="secondary-btn">Show Console</button>
-                <div id="console-output" class="console-output" style="display: none;"></div>
-            </div>
-            
             <!-- Plan and Session Selection -->
             <div class="plan-session-selector">
                 <div class="form-group">
@@ -123,108 +114,5 @@
     </div>
     
     <script src="js/input.js"></script>
-    <script>
-        // Add diagnostic functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const connectionStatus = document.getElementById('connection-status');
-            const testConnectionBtn = document.getElementById('test-connection');
-            const toggleConsoleBtn = document.getElementById('toggle-console');
-            const consoleOutput = document.getElementById('console-output');
-            
-            // Override console.log to capture output
-            const originalLog = console.log;
-            const originalError = console.error;
-            
-            function addToConsole(message, isError = false) {
-                const entry = document.createElement('div');
-                entry.textContent = message;
-                if (isError) entry.style.color = 'red';
-                consoleOutput.appendChild(entry);
-                consoleOutput.scrollTop = consoleOutput.scrollHeight;
-            }
-            
-            console.log = function(message) {
-                originalLog.apply(console, arguments);
-                addToConsole(typeof message === 'object' ? JSON.stringify(message) : message);
-            };
-            
-            console.error = function(message) {
-                originalError.apply(console, arguments);
-                addToConsole(typeof message === 'object' ? JSON.stringify(message) : message, true);
-            };
-            
-            // Test connection button
-            testConnectionBtn.addEventListener('click', function() {
-                connectionStatus.textContent = 'Testing connection...';
-                connectionStatus.style.color = 'orange';
-                
-                // Clear console
-                consoleOutput.innerHTML = '';
-                
-                // Test database connection
-                try {
-                    if (!window.firebaseInitialized) {
-                        connectionStatus.textContent = 'Error: Firebase not initialized';
-                        connectionStatus.style.color = 'red';
-                        return;
-                    }
-                    
-                    const testDoc = window.db.collection('_connection_test').doc('test');
-                    testDoc.set({ 
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        browser: navigator.userAgent,
-                        testTime: new Date().toISOString()
-                    })
-                    .then(() => {
-                        connectionStatus.textContent = 'Connection successful!';
-                        connectionStatus.style.color = 'green';
-                        console.log('✅ Database write test successful');
-                        
-                        // Now try reading
-                        return testDoc.get();
-                    })
-                    .then(doc => {
-                        if (doc.exists) {
-                            console.log('✅ Database read test successful');
-                            console.log('Retrieved data:', doc.data());
-                        } else {
-                            console.error('❌ Document does not exist after writing');
-                            connectionStatus.textContent = 'Error: Document not found after writing';
-                            connectionStatus.style.color = 'red';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('❌ Connection test failed:', error);
-                        connectionStatus.textContent = 'Connection failed: ' + error.message;
-                        connectionStatus.style.color = 'red';
-                    });
-                } catch (error) {
-                    console.error('❌ Error during test:', error);
-                    connectionStatus.textContent = 'Error: ' + error.message;
-                    connectionStatus.style.color = 'red';
-                }
-            });
-            
-            // Toggle console button
-            toggleConsoleBtn.addEventListener('click', function() {
-                if (consoleOutput.style.display === 'none') {
-                    consoleOutput.style.display = 'block';
-                    toggleConsoleBtn.textContent = 'Hide Console';
-                } else {
-                    consoleOutput.style.display = 'none';
-                    toggleConsoleBtn.textContent = 'Show Console';
-                }
-            });
-            
-            // Initial check
-            if (window.firebaseInitialized) {
-                connectionStatus.textContent = 'Firebase initialized';
-                connectionStatus.style.color = 'blue';
-            } else {
-                connectionStatus.textContent = 'Firebase not initialized';
-                connectionStatus.style.color = 'red';
-            }
-        });
-    </script>
 </body>
 </html> 

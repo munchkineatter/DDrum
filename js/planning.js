@@ -11,6 +11,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedPlansSelect = document.getElementById('saved-plans-select');
     const timelineView = document.getElementById('timeline-view');
     
+    // Prize template elements
+    const loadPrizeTemplateBtn = document.getElementById('load-prize-template');
+    const savePrizeTemplateBtn = document.getElementById('save-prize-template');
+    const prizeTemplateModal = document.getElementById('prize-template-modal');
+    const templateSaveForm = document.querySelector('.template-save-form');
+    const saveTemplateBtn = document.getElementById('save-template-btn');
+    const templateName = document.getElementById('template-name');
+    const prizeTemplatesContainer = document.getElementById('prize-templates-container');
+    const closeModal = document.querySelector('.close-modal');
+    
     // Bulk session creation elements
     const bulkStartTime = document.getElementById('bulk-start-time');
     const bulkEndTime = document.getElementById('bulk-end-time');
@@ -53,6 +63,22 @@ document.addEventListener('DOMContentLoaded', function() {
     clearPlanBtn.addEventListener('click', () => clearPlan(true));
     deletePlanBtn.addEventListener('click', deletePlan);
     createSessionsBtn.addEventListener('click', createBulkSessions);
+    
+    // Prize template event listeners
+    loadPrizeTemplateBtn.addEventListener('click', openPrizeTemplateModal);
+    savePrizeTemplateBtn.addEventListener('click', function() {
+        templateSaveForm.style.display = 'block';
+        prizeTemplateModal.style.display = 'block';
+    });
+    saveTemplateBtn.addEventListener('click', savePrizeTemplate);
+    closeModal.addEventListener('click', function() {
+        prizeTemplateModal.style.display = 'none';
+    });
+    window.addEventListener('click', function(event) {
+        if (event.target === prizeTemplateModal) {
+            prizeTemplateModal.style.display = 'none';
+        }
+    });
     
     // Set promotion name for display header
     document.getElementById('promotionName').addEventListener('input', function() {
@@ -233,9 +259,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Setup repeat prize button
+        setupApplyToAllButton(prizeItem);
+        
+        return prizeItem;
+    }
+    
+    // Setup the "Apply to all sessions" button
+    function setupApplyToAllButton(prizeItem) {
         prizeItem.querySelector('.repeat-prize-button').addEventListener('click', function() {
-            const prizeName = prizeItem.querySelector('.prize-name').value;
-            const prizeValue = prizeItem.querySelector('.prize-value').value;
+            const prizeName = prizeItem.querySelector('.prize-name').value.trim();
+            const prizeValue = prizeItem.querySelector('.prize-value').value.trim();
             
             if (!prizeName) {
                 alert('Please enter a prize name first');
@@ -244,9 +277,15 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Apply this prize to all sessions
             const sessions = document.querySelectorAll('.session-item');
+            if (sessions.length === 0) {
+                alert('No sessions available. Please create at least one session first.');
+                return;
+            }
+            
             if (confirm(`Apply "${prizeName}" to all ${sessions.length} sessions?`)) {
+                let appliedCount = 0;
+                
                 sessions.forEach(session => {
-                    const sessionId = session.getAttribute('data-id');
                     const prizesList = session.querySelector('.session-prizes-list');
                     
                     // Create prize selection item
@@ -263,73 +302,220 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     
                     prizesList.appendChild(prizeSelectionItem);
+                    appliedCount++;
                 });
                 
-                alert(`Prize "${prizeName}" has been applied to all sessions`);
+                alert(`Prize "${prizeName}" has been applied to ${appliedCount} sessions.`);
             }
         });
     }
     
-    // Assign prize to a session
+    // Assign prize to a specific session
     function assignPrizeToSession(sessionId) {
-        const sessionItem = document.querySelector(`.session-item[data-id="${sessionId}"]`);
-        if (!sessionItem) return;
+        const session = document.querySelector(`.session-item[data-id="${sessionId}"]`);
+        if (!session) return;
         
-        const prizeItems = document.querySelectorAll('#prize-list .prize-item');
-        if (prizeItems.length === 0) {
-            alert('Please add prizes first');
+        const prizesList = session.querySelector('.session-prizes-list');
+        
+        // Get current prizes
+        const currentPrizes = Array.from(prizeList.querySelectorAll('.prize-item')).map(item => {
+            const name = item.querySelector('.prize-name').value.trim();
+            const value = item.querySelector('.prize-value').value.trim();
+            return { name, value };
+        }).filter(prize => prize.name);
+        
+        if (currentPrizes.length === 0) {
+            alert('No prizes defined. Please add prizes first.');
             return;
         }
         
-        // Build prizes list
-        let prizesOptions = [];
-        prizeItems.forEach(item => {
-            const name = item.querySelector('.prize-name').value;
-            const value = item.querySelector('.prize-value').value;
-            
-            if (name) {
-                prizesOptions.push({ name, value });
-            }
-        });
-        
-        if (prizesOptions.length === 0) {
-            alert('Please add at least one prize with a name');
-            return;
-        }
-        
-        // Ask user to select a prize
-        const prizeIndex = prompt(
-            `Select a prize to assign (1-${prizesOptions.length}):\n` +
-            prizesOptions.map((prize, i) => 
-                `${i + 1}. ${prize.name} ${prize.value ? `($${prize.value})` : ''}`
-            ).join('\n')
-        );
-        
-        if (!prizeIndex) return;
-        
-        const selectedIndex = parseInt(prizeIndex) - 1;
-        if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= prizesOptions.length) {
-            alert('Invalid selection');
-            return;
-        }
-        
-        const selectedPrize = prizesOptions[selectedIndex];
-        
-        // Add prize to session
-        const sessionPrizesList = sessionItem.querySelector('.session-prizes-list');
-        const prizeSelectionItem = document.createElement('div');
-        prizeSelectionItem.className = 'prize-selection';
-        prizeSelectionItem.innerHTML = `
-            <span>${selectedPrize.name} ${selectedPrize.value ? `($${selectedPrize.value})` : ''}</span>
-            <button type="button" class="remove-prize">×</button>
+        // Open popup to select prizes from available prizes
+        const popup = document.createElement('div');
+        popup.className = 'prize-selection-popup';
+        popup.innerHTML = `
+            <div class="popup-content">
+                <h3>Select Prize</h3>
+                <div class="available-prizes"></div>
+                <div class="popup-actions">
+                    <button type="button" class="cancel-btn">Cancel</button>
+                </div>
+            </div>
         `;
         
-        // Add remove button event
-        prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
-            prizeSelectionItem.remove();
+        // Add available prizes
+        const availablePrizes = popup.querySelector('.available-prizes');
+        currentPrizes.forEach(prize => {
+            const prizeOption = document.createElement('div');
+            prizeOption.className = 'prize-option';
+            prizeOption.innerHTML = `${prize.name} ${prize.value ? `($${prize.value})` : ''}`;
+            prizeOption.addEventListener('click', function() {
+                // Add selected prize to session
+                const prizeSelectionItem = document.createElement('div');
+                prizeSelectionItem.className = 'prize-selection';
+                prizeSelectionItem.innerHTML = `
+                    <span>${prize.name} ${prize.value ? `($${prize.value})` : ''}</span>
+                    <button type="button" class="remove-prize">×</button>
+                `;
+                
+                // Add remove button event
+                prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
+                    prizeSelectionItem.remove();
+                });
+                
+                prizesList.appendChild(prizeSelectionItem);
+                
+                // Close popup
+                document.body.removeChild(popup);
+            });
+            availablePrizes.appendChild(prizeOption);
         });
         
-        sessionPrizesList.appendChild(prizeSelectionItem);
+        // Cancel button
+        popup.querySelector('.cancel-btn').addEventListener('click', function() {
+            document.body.removeChild(popup);
+        });
+        
+        // Add popup to body
+        document.body.appendChild(popup);
+    }
+    
+    // Open the prize template modal
+    function openPrizeTemplateModal() {
+        // Load prize templates from Firebase
+        loadPrizeTemplates().then(templates => {
+            // Clear container
+            prizeTemplatesContainer.innerHTML = '';
+            
+            if (templates.length === 0) {
+                prizeTemplatesContainer.innerHTML = '<div class="placeholder">No prize templates found</div>';
+            } else {
+                // Display templates
+                templates.forEach(template => {
+                    const templateDiv = document.createElement('div');
+                    templateDiv.className = 'prize-template';
+                    
+                    let prizeItems = '';
+                    template.prizes.forEach(prize => {
+                        prizeItems += `
+                            <div class="prize-list-item">
+                                <span>${prize.name}</span>
+                                <span>${prize.value ? `$${prize.value}` : ''}</span>
+                            </div>
+                        `;
+                    });
+                    
+                    templateDiv.innerHTML = `
+                        <h4>${template.name}</h4>
+                        <div class="prize-list">
+                            ${prizeItems}
+                        </div>
+                    `;
+                    
+                    // Add click event to load this template
+                    templateDiv.addEventListener('click', function() {
+                        loadPrizeTemplateData(template);
+                        prizeTemplateModal.style.display = 'none';
+                    });
+                    
+                    prizeTemplatesContainer.appendChild(templateDiv);
+                });
+            }
+        }).catch(error => {
+            console.error('Error loading prize templates:', error);
+            prizeTemplatesContainer.innerHTML = '<div class="placeholder error">Error loading templates</div>';
+        });
+        
+        // Hide the save form
+        templateSaveForm.style.display = 'none';
+        
+        // Show the modal
+        prizeTemplateModal.style.display = 'block';
+    }
+    
+    // Load prize templates from Firebase
+    async function loadPrizeTemplates() {
+        try {
+            const snapshot = await db.collection('prizeTemplates').get();
+            const templates = [];
+            
+            snapshot.forEach(doc => {
+                templates.push(doc.data());
+            });
+            
+            return templates;
+        } catch (error) {
+            console.error('Error loading prize templates:', error);
+            return [];
+        }
+    }
+    
+    // Load prize template data into the form
+    function loadPrizeTemplateData(template) {
+        // Clear existing prizes
+        prizeList.innerHTML = '';
+        
+        // Add prizes from template
+        template.prizes.forEach(prize => {
+            const prizeItem = addPrize();
+            prizeItem.querySelector('.prize-name').value = prize.name;
+            prizeItem.querySelector('.prize-value').value = prize.value || '';
+        });
+    }
+    
+    // Save current prizes as a template
+    async function savePrizeTemplate() {
+        const name = templateName.value.trim();
+        
+        if (!name) {
+            alert('Please enter a template name');
+            return;
+        }
+        
+        // Get all prizes
+        const prizes = Array.from(prizeList.querySelectorAll('.prize-item')).map(item => {
+            const name = item.querySelector('.prize-name').value.trim();
+            const value = item.querySelector('.prize-value').value.trim();
+            
+            if (name) {
+                return { name, value };
+            }
+            return null;
+        }).filter(prize => prize !== null);
+        
+        if (prizes.length === 0) {
+            alert('No prizes to save. Please add at least one prize.');
+            return;
+        }
+        
+        // Create template object
+        const template = {
+            name: name,
+            prizes: prizes,
+            createdAt: new Date().toISOString()
+        };
+        
+        try {
+            // Check if template with same name exists
+            const existingDoc = await db.collection('prizeTemplates').doc(name).get();
+            
+            if (existingDoc.exists) {
+                if (!confirm(`A template named "${name}" already exists. Do you want to replace it?`)) {
+                    return;
+                }
+            }
+            
+            // Save to Firebase
+            await db.collection('prizeTemplates').doc(name).set(template);
+            
+            alert(`Prize template "${name}" saved successfully!`);
+            
+            // Clear form and close modal
+            templateName.value = '';
+            prizeTemplateModal.style.display = 'none';
+        } catch (error) {
+            console.error('Error saving prize template:', error);
+            alert('Error saving prize template: ' + error.message);
+        }
     }
     
     // Update timeline with numbered sessions
