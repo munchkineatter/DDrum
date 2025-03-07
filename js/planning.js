@@ -34,6 +34,11 @@ document.addEventListener('DOMContentLoaded', function() {
         prizes: []
     };
     
+    // Status elements
+    const saveStatus = document.createElement('div');
+    saveStatus.className = 'status-message';
+    document.querySelector('.action-buttons').appendChild(saveStatus);
+    
     // Set current date
     setCurrentDate();
     
@@ -53,11 +58,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('promotionName').addEventListener('input', function() {
         const name = this.value;
         currentPlan.name = name;
-        
-        // Update active plan with new name
-        const activePlan = JSON.parse(localStorage.getItem('activePlan') || '{}');
-        activePlan.name = name;
-        localStorage.setItem('activePlan', JSON.stringify(activePlan));
     });
     
     // Set current date in date picker
@@ -430,11 +430,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Set as active session
                 currentPlan.activeSession = session.id;
-                
-                // Update active plan with active session
-                const activePlan = JSON.parse(localStorage.getItem('activePlan') || '{}');
-                activePlan.activeSession = session.id;
-                localStorage.setItem('activePlan', JSON.stringify(activePlan));
             });
         });
     }
@@ -451,8 +446,51 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${hour12}:${minutes} ${isPM ? 'PM' : 'AM'}`;
     }
     
-    // Save the current plan
-    function savePlan() {
+    // Load saved plans from Firebase
+    async function loadSavedPlansList() {
+        try {
+            savedPlansSelect.innerHTML = '<option value="">Select a saved plan</option>';
+            saveStatus.textContent = "Loading plans...";
+            saveStatus.style.display = "block";
+            
+            const plans = await firebasePlans.getAllPlans();
+            
+            if (plans && plans.length > 0) {
+                plans.forEach(plan => {
+                    const option = document.createElement('option');
+                    option.value = plan.name;
+                    option.textContent = `${plan.name} (${plan.date})`;
+                    savedPlansSelect.appendChild(option);
+                });
+                
+                saveStatus.textContent = `${plans.length} plans loaded from database`;
+                setTimeout(() => {
+                    saveStatus.style.display = "none";
+                }, 3000);
+            } else {
+                saveStatus.textContent = "No plans found in database";
+                setTimeout(() => {
+                    saveStatus.style.display = "none";
+                }, 3000);
+            }
+            
+            // Check for active plan
+            const activePlan = await firebasePlans.getActivePlan();
+            if (activePlan) {
+                // Don't automatically load it, just select it in the dropdown
+                savedPlansSelect.value = activePlan.name;
+            }
+        } catch (error) {
+            console.error("Error loading plans:", error);
+            saveStatus.textContent = "Error loading plans from database";
+            setTimeout(() => {
+                saveStatus.style.display = "none";
+            }, 3000);
+        }
+    }
+    
+    // Save the current plan to Firebase
+    async function savePlan() {
         const promotionName = document.getElementById('promotionName').value.trim();
         const promotionDate = document.getElementById('promotionDate').value;
         const masterTimer = parseInt(document.getElementById('masterTimer').value) || 5;
@@ -509,124 +547,184 @@ document.addEventListener('DOMContentLoaded', function() {
             masterTimer: masterTimer,
             prizes: prizes,
             sessions: sessions,
-            activeSession: currentPlan.activeSession
+            activeSession: currentPlan.activeSession,
+            lastModified: new Date().toISOString()
         };
         
-        // Save as active plan and to saved plans
-        localStorage.setItem('activePlan', JSON.stringify(plan));
-        
-        // Get existing saved plans
-        const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
-        
-        // Check if plan with same name already exists
-        const existingPlanIndex = savedPlans.findIndex(p => p.name === plan.name);
-        
-        if (existingPlanIndex >= 0) {
-            if (confirm(`A plan named "${plan.name}" already exists. Do you want to replace it?`)) {
-                savedPlans[existingPlanIndex] = plan;
-            } else {
+        // Save to Firebase
+        try {
+            saveStatus.textContent = "Saving plan...";
+            saveStatus.style.display = "block";
+            
+            // Check if plan already exists
+            const existingPlan = await firebasePlans.getPlan(plan.name);
+            
+            if (existingPlan && !confirm(`A plan named "${plan.name}" already exists. Do you want to replace it?`)) {
+                saveStatus.textContent = "Save cancelled";
+                setTimeout(() => {
+                    saveStatus.style.display = "none";
+                }, 3000);
                 return;
             }
-        } else {
-            savedPlans.push(plan);
+            
+            // Save the plan
+            await firebasePlans.savePlan(plan);
+            
+            // Set as active plan
+            await firebasePlans.setActivePlan(plan);
+            
+            // Update local state
+            currentPlan = plan;
+            
+            // Update the plans list
+            await loadSavedPlansList();
+            
+            saveStatus.textContent = `Plan "${plan.name}" saved successfully!`;
+            setTimeout(() => {
+                saveStatus.style.display = "none";
+            }, 3000);
+        } catch (error) {
+            console.error("Error saving plan:", error);
+            saveStatus.textContent = "Error saving plan to database";
+            setTimeout(() => {
+                saveStatus.style.display = "none";
+            }, 3000);
         }
-        
-        // Save updated plans list
-        localStorage.setItem('savedPlans', JSON.stringify(savedPlans));
-        
-        // Update saved plans dropdown
-        loadSavedPlansList();
-        
-        alert(`Plan "${plan.name}" saved successfully!`);
     }
     
-    // Load saved plans into dropdown
-    function loadSavedPlansList() {
-        const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
-        const savedPlansSelect = document.getElementById('saved-plans-select');
-        
-        // Clear existing options except the placeholder
-        while (savedPlansSelect.options.length > 1) {
-            savedPlansSelect.remove(1);
-        }
-        
-        // Add plans as options
-        savedPlans.forEach(plan => {
-            const option = document.createElement('option');
-            option.value = plan.name;
-            option.textContent = `${plan.name} (${plan.date})`;
-            savedPlansSelect.appendChild(option);
-        });
-    }
-    
-    // Load plan
-    function loadPlan() {
-        const selectedPlanName = document.getElementById('saved-plans-select').value;
+    // Load plan from Firebase
+    async function loadPlan() {
+        const selectedPlanName = savedPlansSelect.value;
         
         if (!selectedPlanName) {
             alert('Please select a plan to load');
             return;
         }
         
-        // Get saved plans
-        const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
-        const selectedPlan = savedPlans.find(plan => plan.name === selectedPlanName);
-        
-        if (!selectedPlan) {
-            alert('Could not find the selected plan');
-            return;
-        }
-        
-        // Clear current plan
-        clearPlan(false);
-        
-        // Load plan data
-        document.getElementById('promotionName').value = selectedPlan.name;
-        document.getElementById('promotionDate').value = selectedPlan.date;
-        document.getElementById('masterTimer').value = selectedPlan.masterTimer || 5;
-        
-        // Load prizes
-        prizeList.innerHTML = '';
-        if (selectedPlan.prizes && selectedPlan.prizes.length > 0) {
-            selectedPlan.prizes.forEach(prize => {
-                const prizeItem = document.createElement('div');
-                prizeItem.className = 'prize-item';
-                prizeItem.innerHTML = `
-                    <input type="text" placeholder="Prize name" class="prize-name" value="${prize.name || ''}">
-                    <input type="text" placeholder="Value" class="prize-value" value="${prize.value || ''}">
-                    <button type="button" class="remove-prize">×</button>
-                    <button type="button" class="repeat-prize-button">Apply to all sessions</button>
-                `;
-                
-                prizeList.appendChild(prizeItem);
-                
-                // Setup remove button
-                prizeItem.querySelector('.remove-prize').addEventListener('click', function() {
-                    prizeItem.remove();
+        try {
+            saveStatus.textContent = "Loading plan...";
+            saveStatus.style.display = "block";
+            
+            // Get the plan from Firebase
+            const selectedPlan = await firebasePlans.getPlan(selectedPlanName);
+            
+            if (!selectedPlan) {
+                alert('Could not find the selected plan');
+                saveStatus.textContent = "Plan not found";
+                setTimeout(() => {
+                    saveStatus.style.display = "none";
+                }, 3000);
+                return;
+            }
+            
+            // Clear current plan
+            clearPlan(false);
+            
+            // Load plan data
+            document.getElementById('promotionName').value = selectedPlan.name;
+            document.getElementById('promotionDate').value = selectedPlan.date;
+            document.getElementById('masterTimer').value = selectedPlan.masterTimer || 5;
+            
+            // Load prizes
+            prizeList.innerHTML = '';
+            if (selectedPlan.prizes && selectedPlan.prizes.length > 0) {
+                selectedPlan.prizes.forEach(prize => {
+                    const prizeItem = document.createElement('div');
+                    prizeItem.className = 'prize-item';
+                    prizeItem.innerHTML = `
+                        <input type="text" placeholder="Prize name" class="prize-name" value="${prize.name || ''}">
+                        <input type="text" placeholder="Value" class="prize-value" value="${prize.value || ''}">
+                        <button type="button" class="remove-prize">×</button>
+                        <button type="button" class="repeat-prize-button">Apply to all sessions</button>
+                    `;
+                    
+                    prizeList.appendChild(prizeItem);
+                    
+                    // Setup remove button
+                    prizeItem.querySelector('.remove-prize').addEventListener('click', function() {
+                        prizeItem.remove();
+                    });
+                    
+                    // Setup repeat prize button
+                    prizeItem.querySelector('.repeat-prize-button').addEventListener('click', function() {
+                        const prizeName = prizeItem.querySelector('.prize-name').value;
+                        const prizeValue = prizeItem.querySelector('.prize-value').value;
+                        
+                        if (!prizeName) {
+                            alert('Please enter a prize name first');
+                            return;
+                        }
+                        
+                        // Apply this prize to all sessions
+                        const sessions = document.querySelectorAll('.session-item');
+                        if (confirm(`Apply "${prizeName}" to all ${sessions.length} sessions?`)) {
+                            sessions.forEach(session => {
+                                const sessionId = session.getAttribute('data-id');
+                                const prizesList = session.querySelector('.session-prizes-list');
+                                
+                                // Create prize selection item
+                                const prizeSelectionItem = document.createElement('div');
+                                prizeSelectionItem.className = 'prize-selection';
+                                prizeSelectionItem.innerHTML = `
+                                    <span>${prizeName} ${prizeValue ? `($${prizeValue})` : ''}</span>
+                                    <button type="button" class="remove-prize">×</button>
+                                `;
+                                
+                                // Add remove button event
+                                prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
+                                    prizeSelectionItem.remove();
+                                });
+                                
+                                prizesList.appendChild(prizeSelectionItem);
+                            });
+                        }
+                    });
                 });
+            } else {
+                // Add a default prize item if none exist
+                addPrize();
+            }
+            
+            // Set prize count
+            prizeCount = selectedPlan.prizes ? selectedPlan.prizes.length : 1;
+            
+            // Load sessions
+            sessionsGrid.innerHTML = '';
+            if (selectedPlan.sessions && selectedPlan.sessions.length > 0) {
+                sessionCount = 0;
                 
-                // Setup repeat prize button
-                prizeItem.querySelector('.repeat-prize-button').addEventListener('click', function() {
-                    const prizeName = prizeItem.querySelector('.prize-name').value;
-                    const prizeValue = prizeItem.querySelector('.prize-value').value;
+                selectedPlan.sessions.forEach(session => {
+                    sessionCount++;
+                    const sessionId = session.id || `session-${Date.now()}-${sessionCount}`;
                     
-                    if (!prizeName) {
-                        alert('Please enter a prize name first');
-                        return;
-                    }
+                    const fragment = document.createRange().createContextualFragment(
+                        sessionTemplate.innerHTML
+                            .replace(/{{id}}/g, sessionId)
+                            .replace(/{{number}}/g, session.number || sessionCount)
+                    );
                     
-                    // Apply this prize to all sessions
-                    const sessions = document.querySelectorAll('.session-item');
-                    if (confirm(`Apply "${prizeName}" to all ${sessions.length} sessions?`)) {
-                        sessions.forEach(session => {
-                            const sessionId = session.getAttribute('data-id');
-                            const prizesList = session.querySelector('.session-prizes-list');
-                            
-                            // Create prize selection item
+                    // Create a grid item container for the session
+                    const gridItem = document.createElement('div');
+                    gridItem.className = 'session-grid-item';
+                    gridItem.appendChild(fragment);
+                    
+                    sessionsGrid.appendChild(gridItem);
+                    
+                    const sessionItem = gridItem.querySelector(`[data-id="${sessionId}"]`);
+                    
+                    // Set session values
+                    sessionItem.querySelector('.session-start-time').value = session.startTime || '';
+                    sessionItem.querySelector('.session-end-time').value = session.endTime || '';
+                    sessionItem.querySelector('.session-winners').value = session.winners || 1;
+                    
+                    // Add prizes to session
+                    const prizesList = sessionItem.querySelector('.session-prizes-list');
+                    if (session.prizes && session.prizes.length > 0) {
+                        session.prizes.forEach(prizeText => {
                             const prizeSelectionItem = document.createElement('div');
                             prizeSelectionItem.className = 'prize-selection';
                             prizeSelectionItem.innerHTML = `
-                                <span>${prizeName} ${prizeValue ? `($${prizeValue})` : ''}</span>
+                                <span>${prizeText}</span>
                                 <button type="button" class="remove-prize">×</button>
                             `;
                             
@@ -638,80 +736,35 @@ document.addEventListener('DOMContentLoaded', function() {
                             prizesList.appendChild(prizeSelectionItem);
                         });
                     }
+                    
+                    // Set up event listeners for this session
+                    setupSessionEvents(sessionItem, sessionId);
                 });
-            });
-        } else {
-            // Add a default prize item if none exist
-            addPrize();
-        }
-        
-        // Set prize count
-        prizeCount = selectedPlan.prizes ? selectedPlan.prizes.length : 1;
-        
-        // Load sessions
-        sessionsGrid.innerHTML = '';
-        if (selectedPlan.sessions && selectedPlan.sessions.length > 0) {
-            sessionCount = 0;
+            }
             
-            selectedPlan.sessions.forEach(session => {
-                sessionCount++;
-                const sessionId = session.id || `session-${Date.now()}-${sessionCount}`;
-                
-                const fragment = document.createRange().createContextualFragment(
-                    sessionTemplate.innerHTML
-                        .replace(/{{id}}/g, sessionId)
-                        .replace(/{{number}}/g, session.number || sessionCount)
-                );
-                
-                // Create a grid item container for the session
-                const gridItem = document.createElement('div');
-                gridItem.className = 'session-grid-item';
-                gridItem.appendChild(fragment);
-                
-                sessionsGrid.appendChild(gridItem);
-                
-                const sessionItem = gridItem.querySelector(`[data-id="${sessionId}"]`);
-                
-                // Set session values
-                sessionItem.querySelector('.session-start-time').value = session.startTime || '';
-                sessionItem.querySelector('.session-end-time').value = session.endTime || '';
-                sessionItem.querySelector('.session-winners').value = session.winners || 1;
-                
-                // Add prizes to session
-                const prizesList = sessionItem.querySelector('.session-prizes-list');
-                if (session.prizes && session.prizes.length > 0) {
-                    session.prizes.forEach(prizeText => {
-                        const prizeSelectionItem = document.createElement('div');
-                        prizeSelectionItem.className = 'prize-selection';
-                        prizeSelectionItem.innerHTML = `
-                            <span>${prizeText}</span>
-                            <button type="button" class="remove-prize">×</button>
-                        `;
-                        
-                        // Add remove button event
-                        prizeSelectionItem.querySelector('.remove-prize').addEventListener('click', function() {
-                            prizeSelectionItem.remove();
-                        });
-                        
-                        prizesList.appendChild(prizeSelectionItem);
-                    });
-                }
-                
-                // Set up event listeners for this session
-                setupSessionEvents(sessionItem, sessionId);
-            });
+            // Set active session
+            currentPlan.activeSession = selectedPlan.activeSession || '';
+            
+            // Update timeline
+            updateTimeline();
+            
+            // Set as active plan in Firebase
+            await firebasePlans.setActivePlan(selectedPlan);
+            
+            // Update local state
+            currentPlan = selectedPlan;
+            
+            saveStatus.textContent = `Plan "${selectedPlan.name}" loaded successfully!`;
+            setTimeout(() => {
+                saveStatus.style.display = "none";
+            }, 3000);
+        } catch (error) {
+            console.error("Error loading plan:", error);
+            saveStatus.textContent = "Error loading plan from database";
+            setTimeout(() => {
+                saveStatus.style.display = "none";
+            }, 3000);
         }
-        
-        // Set active session
-        currentPlan.activeSession = selectedPlan.activeSession || '';
-        
-        // Update timeline
-        updateTimeline();
-        
-        // Set as active plan
-        localStorage.setItem('activePlan', JSON.stringify(selectedPlan));
-        
-        alert(`Plan "${selectedPlan.name}" loaded successfully!`);
     }
     
     // Clear plan
@@ -747,26 +800,39 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     
-    // Delete plan
-    function deletePlan() {
+    // Delete plan from Firebase
+    async function deletePlan() {
         const planName = savedPlansSelect.value;
+        
         if (!planName) {
             alert('Please select a plan to delete');
             return;
         }
         
-        if (!confirm(`Are you sure you want to delete the plan "${planName}"?`)) {
+        if (!confirm(`Are you sure you want to delete the plan "${planName}"? This cannot be undone.`)) {
             return;
         }
         
-        // Delete from localStorage
-        const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
-        const updatedPlans = savedPlans.filter(plan => plan.name !== planName);
-        localStorage.setItem('savedPlans', JSON.stringify(updatedPlans));
-        
-        // Update saved plans list
-        loadSavedPlansList();
-        
-        alert(`Plan "${planName}" deleted successfully`);
+        try {
+            saveStatus.textContent = "Deleting plan...";
+            saveStatus.style.display = "block";
+            
+            // Delete from Firebase
+            await firebasePlans.deletePlan(planName);
+            
+            // Update the plans list
+            await loadSavedPlansList();
+            
+            saveStatus.textContent = `Plan "${planName}" deleted successfully`;
+            setTimeout(() => {
+                saveStatus.style.display = "none";
+            }, 3000);
+        } catch (error) {
+            console.error("Error deleting plan:", error);
+            saveStatus.textContent = "Error deleting plan from database";
+            setTimeout(() => {
+                saveStatus.style.display = "none";
+            }, 3000);
+        }
     }
 }); 

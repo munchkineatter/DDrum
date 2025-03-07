@@ -1,203 +1,224 @@
 document.addEventListener('DOMContentLoaded', function() {
     const winnersDisplay = document.getElementById('winners-display');
-    const headerImageContainer = document.getElementById('headerImageContainer');
-    const timerElement = document.getElementById('timer');
+    const headerContainer = document.getElementById('headerImageContainer');
+    const timer = document.getElementById('timer');
     const promotionHeader = document.getElementById('promotionHeader');
     
-    // Set the API URL based on environment
-    const API_URL = 'https://casino-drawing-system.onrender.com'; // Actual Render service URL
+    let timerInterval;
+    let activePlan = null;
+    let winnersUnsubscribe = null; // Store the unsubscribe function for Firestore listener
     
-    // Function to display winners
-    function displayWinners() {
-        // Clear any existing content
+    // Initialize by loading active plan and winners
+    initializeDisplay();
+    
+    // Set up real-time listener for winners
+    function initializeDisplay() {
+        // Try to get active plan first
+        getActivePlan().then(plan => {
+            if (plan) {
+                activePlan = plan;
+                updateHeader(plan.name);
+                
+                // Set timer to plan's master timer
+                if (plan.masterTimer) {
+                    initializeTimer(plan.masterTimer * 60);
+                } else {
+                    initializeTimer(300); // Default 5 minutes
+                }
+                
+                // If there's an active session, highlight that in the display
+                if (plan.activeSession) {
+                    const activeSession = plan.sessions.find(s => s.id === plan.activeSession);
+                    if (activeSession) {
+                        const sessionInfo = document.createElement('div');
+                        sessionInfo.className = 'session-info';
+                        sessionInfo.innerHTML = `
+                            <p>Current Session: ${activeSession.number} 
+                            (${formatTimeForDisplay(activeSession.startTime)} - ${formatTimeForDisplay(activeSession.endTime)})</p>
+                        `;
+                        winnersDisplay.appendChild(sessionInfo);
+                    }
+                }
+            }
+        });
+        
+        // Set up real-time listener for winners
+        setupWinnersListener();
+        
+        // Check for a saved header image
+        const headerImage = localStorage.getItem('casinoHeaderImage');
+        if (headerImage) {
+            headerContainer.innerHTML = `<img src="${headerImage}" alt="Header">`;
+        }
+    }
+    
+    // Get active plan from Firebase
+    async function getActivePlan() {
+        try {
+            return await firebasePlans.getActivePlan();
+        } catch (error) {
+            console.error('Error getting active plan:', error);
+            return null;
+        }
+    }
+    
+    // Set up real-time listener for winners
+    function setupWinnersListener() {
+        // If there's an existing listener, unsubscribe first
+        if (winnersUnsubscribe) {
+            winnersUnsubscribe();
+        }
+        
+        // Create the Firestore query to listen for winner updates
+        const winnersRef = db.collection('winners');
+        
+        // Set up the listener
+        winnersUnsubscribe = winnersRef.onSnapshot(snapshot => {
+            const winners = [];
+            
+            snapshot.forEach(doc => {
+                winners.push(doc.data());
+            });
+            
+            // Only show active winners (not claimed or disqualified)
+            const activeWinners = winners.filter(w => !w.claimed && !w.disqualified);
+            
+            // If we have an active session, filter to just that session's winners
+            if (activePlan && activePlan.activeSession) {
+                const sessionWinners = activeWinners.filter(w => w.sessionId === activePlan.activeSession);
+                displayWinners(sessionWinners);
+            } else {
+                displayWinners(activeWinners);
+            }
+        }, error => {
+            console.error('Error listening for winners:', error);
+        });
+    }
+    
+    // Display winners on the page
+    function displayWinners(winners) {
+        // Clear current display
         winnersDisplay.innerHTML = '';
         
-        // Set promotion name if available
-        const activePlan = JSON.parse(localStorage.getItem('activePlan') || '{}');
-        if (activePlan.name) {
-            promotionHeader.textContent = activePlan.name;
+        // Add session info if we have an active plan with active session
+        if (activePlan && activePlan.activeSession) {
+            const activeSession = activePlan.sessions.find(s => s.id === activePlan.activeSession);
+            if (activeSession) {
+                const sessionInfo = document.createElement('div');
+                sessionInfo.className = 'session-info';
+                sessionInfo.innerHTML = `
+                    <p>Current Session: ${activeSession.number} 
+                    (${formatTimeForDisplay(activeSession.startTime)} - ${formatTimeForDisplay(activeSession.endTime)})</p>
+                `;
+                winnersDisplay.appendChild(sessionInfo);
+            }
         }
         
-        // Display header image if available
-        const headerImage = localStorage.getItem('casinoHeaderImage');
-        if (headerImage && headerImageContainer) {
-            headerImageContainer.innerHTML = `<img src="${headerImage}" alt="Header">`;
-        } else {
-            headerImageContainer.innerHTML = '';
-        }
-        
-        // Get winners from localStorage for offline support
-        const localWinners = JSON.parse(localStorage.getItem('winners') || '[]');
-        
-        // Filter out claimed and disqualified winners
-        const activeWinners = localWinners.filter(winner => !winner.claimed && !winner.disqualified);
-        
-        // Display placeholder if no active winners
-        if (activeWinners.length === 0) {
-            winnersDisplay.innerHTML = '<div class="placeholder">Waiting for winners to be announced...</div>';
+        // If no winners, show placeholder
+        if (winners.length === 0) {
+            winnersDisplay.innerHTML += '<div class="placeholder">Waiting for winners to be announced...</div>';
             return;
         }
         
-        // Format and display each winner
-        activeWinners.forEach((winner, index) => {
-            const winnerCard = document.createElement('div');
-            winnerCard.className = 'winner-card';
+        // Add each winner
+        winners.forEach(winner => {
+            const card = document.createElement('div');
+            card.className = 'winner-card';
             
-            // Format the drawing time
-            const drawingTime = winner.timestamp || new Date().toLocaleString();
+            const name = winner.name || 'Winner';
+            const playerId = winner.playerID || '';
+            const prize = winner.prize || '';
             
-            winnerCard.innerHTML = `
-                <h2>Winner #${index + 1}</h2>
-                <p class="winner-name">${winner.name || 'Anonymous'}</p>
-                <p class="winner-id">${winner.uniqueId || 'N/A'}</p>
-                <p class="winner-prize">${winner.prize || 'Prize'}</p>
-                <p class="drawing-time">${drawingTime}</p>
-                <p class="winner-session">Session: ${winner.session || 'Default'}</p>
+            card.innerHTML = `
+                <h2>${name}</h2>
+                ${playerId ? `<p class="player-id">ID: ${playerId}</p>` : ''}
+                ${prize ? `<p class="prize">Prize: ${prize}</p>` : ''}
             `;
             
-            winnersDisplay.appendChild(winnerCard);
-            
-            // Adding a slight delay for animation effect
-            setTimeout(() => {
-                winnerCard.style.opacity = '1';
-                winnerCard.style.transform = 'translateY(0)';
-            }, 100 * index);
+            winnersDisplay.appendChild(card);
         });
-        
-        // Also try to fetch from API as a backup
-        fetch(`${API_URL}/api/winners`)
-            .then(response => response.json())
-            .then(winnersData => {
-                // If we already have local winners, don't display API winners
-                if (localWinners.length > 0) return;
-                
-                if (winnersData.length === 0) {
-                    if (activeWinners.length === 0) {
-                        winnersDisplay.innerHTML = '<div class="placeholder">Waiting for winners to be announced...</div>';
-                    }
-                    return;
-                }
-                
-                // Only if we don't have local winners, display API winners
-                if (activeWinners.length === 0) {
-                    winnersDisplay.innerHTML = ''; // Clear placeholder
-                    
-                    // Format and display each winner from API
-                    winnersData.forEach((winner, index) => {
-                        const winnerCard = document.createElement('div');
-                        winnerCard.className = 'winner-card';
-                        
-                        // Format the drawing time
-                        const drawingDate = new Date(winner.drawingTime);
-                        const formattedDate = drawingDate.toLocaleString();
-                        
-                        winnerCard.innerHTML = `
-                            <h2>Winner #${index + 1}</h2>
-                            <p>${winner.winnerText}</p>
-                            <p class="drawing-time">${formattedDate}</p>
-                        `;
-                        
-                        winnersDisplay.appendChild(winnerCard);
-                        
-                        // Adding a slight delay for animation effect
-                        setTimeout(() => {
-                            winnerCard.style.opacity = '1';
-                            winnerCard.style.transform = 'translateY(0)';
-                        }, 100 * index);
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching winners:', error);
-                // Only show error if we don't have local winners
-                if (activeWinners.length === 0) {
-                    winnersDisplay.innerHTML = '<div class="placeholder">Error loading winners. Please try again later.</div>';
-                }
-            });
     }
     
-    // Initialize and manage timer
-    function initializeTimer() {
-        if (!timerElement) return;
+    // Format time for display
+    function formatTimeForDisplay(timeString) {
+        if (!timeString) return '';
         
-        // Get timer state from localStorage
-        const timerRunning = localStorage.getItem('timerRunning') === 'true';
-        let timerSeconds = parseInt(localStorage.getItem('timerSeconds') || 300);
-        const timerStartTime = parseInt(localStorage.getItem('timerStartTime') || 0);
+        const [hours, minutes] = timeString.split(':');
+        const hour = parseInt(hours);
+        const isPM = hour >= 12;
+        const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
         
-        if (timerRunning && timerStartTime) {
-            // Calculate elapsed time
-            const currentTime = Date.now();
-            const elapsedSeconds = Math.floor((currentTime - timerStartTime) / 1000);
-            timerSeconds = Math.max(0, timerSeconds - elapsedSeconds);
+        return `${hour12}:${minutes} ${isPM ? 'PM' : 'AM'}`;
+    }
+    
+    // Update header with promotion name
+    function updateHeader(name) {
+        if (name) {
+            promotionHeader.textContent = name;
         }
+    }
+    
+    // Initialize timer
+    function initializeTimer(seconds) {
+        updateDisplayTimer(seconds);
         
-        updateDisplayTimer(timerSeconds);
-        
-        if (timerRunning && timerSeconds > 0) {
-            startDisplayTimer(timerSeconds);
-        }
-        
-        // Listen for timer updates
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'timerDisplay') {
-                timerElement.textContent = e.newValue;
-            } else if (e.key === 'timerRunning') {
-                const running = e.newValue === 'true';
-                if (running) {
-                    startDisplayTimer(parseInt(localStorage.getItem('timerSeconds') || 0));
+        // Listen for timer updates from the input page
+        db.collection('config').doc('timer').onSnapshot(doc => {
+            if (doc.exists) {
+                const timerData = doc.data();
+                if (timerData.isRunning) {
+                    startDisplayTimer(timerData.seconds);
                 } else {
-                    clearInterval(displayTimerInterval);
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    updateDisplayTimer(timerData.seconds);
                 }
             }
         });
     }
     
-    let displayTimerInterval;
-    
+    // Start timer
     function startDisplayTimer(seconds) {
-        clearInterval(displayTimerInterval);
+        // Clear existing interval if any
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
         
-        let remaining = seconds;
+        let remainingSeconds = seconds;
+        updateDisplayTimer(remainingSeconds);
         
-        displayTimerInterval = setInterval(() => {
-            remaining--;
+        timerInterval = setInterval(function() {
+            remainingSeconds--;
             
-            if (remaining <= 0) {
-                clearInterval(displayTimerInterval);
-                remaining = 0;
+            if (remainingSeconds <= 0) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                timer.classList.add('timer-finished');
                 
-                // Timer finished effect
-                timerElement.classList.add('timer-finished');
+                // Add blinking animation
+                timer.style.animation = 'blink 1s infinite';
             }
             
-            updateDisplayTimer(remaining);
+            updateDisplayTimer(remainingSeconds);
         }, 1000);
     }
     
+    // Update timer display
     function updateDisplayTimer(seconds) {
+        // Ensure seconds is not negative
+        seconds = Math.max(0, seconds);
+        
         const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
+        const remainingSeconds = seconds % 60;
         
-        const timeString = `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        timer.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
         
-        if (timerElement) {
-            timerElement.textContent = timeString;
+        // Remove timer-finished class and animation if seconds > 0
+        if (seconds > 0 && timer.classList.contains('timer-finished')) {
+            timer.classList.remove('timer-finished');
+            timer.style.animation = '';
         }
     }
-    
-    // Initial display
-    displayWinners();
-    initializeTimer();
-    
-    // Listen for storage events to update winners and timer
-    window.addEventListener('storage', function(e) {
-        if (e.key === 'winners' || e.key === 'casinoHeaderImage' || e.key === 'activePlan') {
-            // Refresh winners display when winners data changes
-            displayWinners();
-        } else if (e.key === 'timerSeconds' || e.key === 'timerRunning' || e.key === 'timerStartTime' || e.key === 'timerDisplay') {
-            // Only update the timer, not the winners list
-            // Timer updates are already handled in initializeTimer()
-        }
-    });
 }); 
